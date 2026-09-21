@@ -1,0 +1,57 @@
+{
+  "name": "njt-map-viewer",
+  "productName": "尼沙皇版图浏览小工具",
+  "version": "1.0.0",
+  "description": "尼沙皇版图浏览小工具：诺文斯克大地图热点导航 + 标注工具",
+  "main": "src/main/main.js",
+  "author": "一只非常屑的彩虹滑稽",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron tools/smoke.js",
+    "shots": "electron tools/screenshot.js",
+    "previews": "python tools/make-previews.py",
+    "dist": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.njt.mapviewer",
+    "productName": "尼沙皇版图浏览小工具",
+    "directories": {
+      "output": "dist"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets"
+      },
+      {
+        "from": "config",
+        "to": "config"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "尼沙皇版图浏览小工具-${version}-portable.exe",
+      "splashImage": "assets/portable-splash.bmp"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}

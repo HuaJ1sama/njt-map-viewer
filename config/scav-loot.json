@@ -1,0 +1,1113 @@
+{
+  "version": 2,
+  "source": "https://www.eftarkov.com/",
+  "sourceApi": "https://api.eftarkov.com/boss.php?id=10",
+  "fetchedAt": "2026-09-20",
+  "cost": 95000,
+  "minRolls": 3,
+  "maxRolls": 6,
+  "extraRollChance": 0.35,
+  "bigRollChance": 0.12,
+  "items": [
+    {
+      "name": "军用绷带",
+      "category": "医疗",
+      "value": 2100,
+      "weight": 200.4608,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "过氧化氢溶液（双氧水）",
+      "category": "医疗",
+      "value": 10000,
+      "weight": 36.0139,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "肾上腺素注射器",
+      "category": "医疗",
+      "value": 16044,
+      "weight": 21.4105,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "P22 (22 号化合物) 兴奋剂注射器",
+      "category": "医疗",
+      "value": 20553,
+      "weight": 16.3045,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Salewa急救包",
+      "category": "医疗",
+      "value": 28333,
+      "weight": 11.4538,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "AFAK单兵急救包",
+      "category": "医疗",
+      "value": 33333,
+      "weight": 9.5788,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "SJ1 TGLabs 战斗兴奋剂注射器",
+      "category": "医疗",
+      "value": 43000,
+      "weight": 7.2386,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "2A2-(b-TG) 兴奋剂注射器",
+      "category": "医疗",
+      "value": 76000,
+      "weight": 3.8688,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "SJ6 TGLabs 战斗兴奋剂注射器",
+      "category": "医疗",
+      "value": 100000,
+      "weight": 2.8607,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Aceso Xpress 半自动生化分析仪",
+      "category": "医疗",
+      "value": 899999,
+      "weight": 0.2552,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "9x18mm PM SP7弹药包（16发装）",
+      "category": "弹药",
+      "value": 2000,
+      "weight": 211.5133,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "7.62x39mm SP弹药包（20发装）",
+      "category": "弹药",
+      "value": 8500,
+      "weight": 43.0636,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "7.62x54mm R FMJ弹药包（20发装）",
+      "category": "弹药",
+      "value": 11111,
+      "weight": 32.0732,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "20/70 TSS 穿甲独头弹 弹药包（25发装）",
+      "category": "弹药",
+      "value": 17777,
+      "weight": 19.1261,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "5.56x45mm MK 255 Mod 0 (RRLP) 弹药包（50发装）",
+      "category": "弹药",
+      "value": 21111,
+      "weight": 15.8311,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "5.7x28mm L191 弹药包（50发装）",
+      "category": "弹药",
+      "value": 27777,
+      "weight": 11.7062,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": ".45 ACP RIP弹药包（50发装）",
+      "category": "弹药",
+      "value": 35500,
+      "weight": 8.9376,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "9x18mm PM Pst 弹药包（50发装）",
+      "category": "弹药",
+      "value": 45000,
+      "weight": 6.8855,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "9x18mm PM RG028 弹药包（50发装）",
+      "category": "弹药",
+      "value": 60000,
+      "weight": 5.0177,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "5.56x45mm M855A1 弹药包（100发装）",
+      "category": "弹药",
+      "value": 225000,
+      "weight": 1.1724,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "程序员日志 (副本)",
+      "category": "情报",
+      "value": 3600,
+      "weight": 110.7995,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "情况报告录音带",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "感应钥匙卡说明书",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "向 TerraGroup 全球总部提交报告的副本",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "《第九圈》第 19 期",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "提到将军的笔记",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "来自 Voevoda 的人质疏散报告",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "C-1 舱室访问记录",
+      "category": "情报",
+      "value": 10483,
+      "weight": 34.1929,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Dunduk 软盘",
+      "category": "情报",
+      "value": 30000,
+      "weight": 10.7557,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "TerraGroup \"蓝色文件夹\" 材料",
+      "category": "情报",
+      "value": 339000,
+      "weight": 0.7469,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "丰和 20 式 5.56x45 突击步枪",
+      "category": "武器",
+      "value": 4050,
+      "weight": 97.3353,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "PP-19-01 勇士 9x19 冲锋枪",
+      "category": "武器",
+      "value": 20000,
+      "weight": 16.8011,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "PP-19-01 勇士 9x19 冲锋枪 OKP-7 DT",
+      "category": "武器",
+      "value": 28793,
+      "weight": 11.2527,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "AK-101 5.56x45 突击步枪",
+      "category": "武器",
+      "value": 35000,
+      "weight": 9.0781,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "谢尔久科夫 SR1MP 9x21 “斑蝰蛇” 半自动手枪 Tactical 1",
+      "category": "武器",
+      "value": 44444,
+      "weight": 6.9803,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "FN SCAR-H 7.62x51 突击步枪 (FDE) 默认",
+      "category": "武器",
+      "value": 53166,
+      "weight": 5.7316,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "HK MP5 9x19 冲锋枪（海军三发点射） SD",
+      "category": "武器",
+      "value": 68500,
+      "weight": 4.3372,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "马林 MXLR .308 ME 杠杆步枪",
+      "category": "武器",
+      "value": 88788,
+      "weight": 3.2605,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "HK MP5 9x19 冲锋枪（海军三发点射） SD Spec",
+      "category": "武器",
+      "value": 120000,
+      "weight": 2.3408,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "奈特军械公司 (KAC) SR-25 7.62x51 精确射手步枪 Ba-cho",
+      "category": "武器",
+      "value": 1000000,
+      "weight": 0.2272,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "无彩香烟",
+      "category": "物资",
+      "value": 2000,
+      "weight": 211.5133,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "管道胶带",
+      "category": "物资",
+      "value": 15000,
+      "weight": 23.0553,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "武器零件",
+      "category": "物资",
+      "value": 18999,
+      "weight": 17.7773,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "罐装白盐",
+      "category": "物资",
+      "value": 24589,
+      "weight": 13.3862,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "OFZ 30x165毫米炮弹",
+      "category": "物资",
+      "value": 28560,
+      "weight": 11.3537,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Recruit Bas-Relief",
+      "category": "物资",
+      "value": 42500,
+      "weight": 7.3323,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Ruthless Bas-Relief",
+      "category": "物资",
+      "value": 52500,
+      "weight": 5.8116,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "BURN 海报",
+      "category": "物资",
+      "value": 80000,
+      "weight": 3.6566,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "为了全人类海报",
+      "category": "物资",
+      "value": 100000,
+      "weight": 2.8607,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Killa 与 Tagilla 海报",
+      "category": "物资",
+      "value": 1999998,
+      "weight": 0.106,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "CPU风扇",
+      "category": "电子",
+      "value": 7777,
+      "weight": 47.4873,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "电脑CPU",
+      "category": "电子",
+      "value": 14000,
+      "weight": 24.8731,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "DVD光驱",
+      "category": "电子",
+      "value": 20000,
+      "weight": 16.8011,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "NIXXOR镜头",
+      "category": "电子",
+      "value": 21999,
+      "weight": 15.1296,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "盖革-穆勒计数器",
+      "category": "电子",
+      "value": 32999,
+      "weight": 9.6855,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "军用电路板",
+      "category": "电子",
+      "value": 36666,
+      "weight": 8.6254,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Iridium军用热成像模块",
+      "category": "电子",
+      "value": 46666,
+      "weight": 6.6156,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "UHF RFID固定式读取器",
+      "category": "电子",
+      "value": 69999,
+      "weight": 4.2352,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "相控阵单元",
+      "category": "电子",
+      "value": 90000,
+      "weight": 3.2122,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "显示卡",
+      "category": "电子",
+      "value": 309999,
+      "weight": 0.8241,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "头巾",
+      "category": "装备",
+      "value": 2000,
+      "weight": 211.5133,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "摔跤传奇假胡子",
+      "category": "装备",
+      "value": 3555,
+      "weight": 112.3433,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "无头鬼面具",
+      "category": "装备",
+      "value": 15000,
+      "weight": 23.0553,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Safariland Liberator HP 2.0听力保护耳机（黑系复合迷彩）",
+      "category": "装备",
+      "value": 21172,
+      "weight": 15.7809,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Oakley SI Batwolf 墨镜",
+      "category": "装备",
+      "value": 30000,
+      "weight": 10.7557,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "FORT Redut-M（堡垒-M）防弹衣（韩国林地迷彩）",
+      "category": "装备",
+      "value": 37453,
+      "weight": 8.4263,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Wilcox Skull Lock头罩基座 PVS-14",
+      "category": "装备",
+      "value": 47017,
+      "weight": 6.5613,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "NFM THOR 一体式防弹护甲",
+      "category": "装备",
+      "value": 64751,
+      "weight": 4.6142,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "CQC 鱼鹰 MK4A 防弹胸挂（防护型，多地形迷彩） 默认",
+      "category": "装备",
+      "value": 86749,
+      "weight": 3.3449,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "绿毛怪 Grinch 面具",
+      "category": "装备",
+      "value": 1000000,
+      "weight": 0.2272,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "圣诞树装饰球（银）",
+      "category": "贵重",
+      "value": 5100,
+      "weight": 75.5342,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "金项链",
+      "category": "贵重",
+      "value": 20000,
+      "weight": 16.8011,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "猫雕像",
+      "category": "贵重",
+      "value": 31777,
+      "weight": 10.0959,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "吸血鬼公爵玩偶",
+      "category": "贵重",
+      "value": 38250,
+      "weight": 8.2333,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Viibiin运动鞋",
+      "category": "贵重",
+      "value": 44999,
+      "weight": 6.8857,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Therapist 玩偶",
+      "category": "贵重",
+      "value": 51999,
+      "weight": 5.8732,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "金公鸡塑像",
+      "category": "贵重",
+      "value": 60000,
+      "weight": 5.0177,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "破冰船模型套件",
+      "category": "贵重",
+      "value": 75000,
+      "weight": 3.9256,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "青铜狮雕",
+      "category": "贵重",
+      "value": 99999,
+      "weight": 2.8607,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Kerman先生的全息猫",
+      "category": "贵重",
+      "value": 1111111,
+      "weight": 0.2024,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "泵站后门钥匙",
+      "category": "钥匙",
+      "value": 2615,
+      "weight": 157.4896,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "\"调解室\"钥匙",
+      "category": "钥匙",
+      "value": 12000,
+      "weight": 29.4694,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "灯塔警用卡车驾驶室钥匙",
+      "category": "钥匙",
+      "value": 19999,
+      "weight": 16.802,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "RB-MP11钥匙",
+      "category": "钥匙",
+      "value": 28888,
+      "weight": 11.212,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "Primorsky 48 公寓钥匙",
+      "category": "钥匙",
+      "value": 40000,
+      "weight": 7.838,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "疗养院西楼 222 房间钥匙",
+      "category": "钥匙",
+      "value": 55000,
+      "weight": 5.5217,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "RB-PSP1钥匙",
+      "category": "钥匙",
+      "value": 80000,
+      "weight": 3.6566,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "TerraGroup科学家办公室钥匙",
+      "category": "钥匙",
+      "value": 120000,
+      "weight": 2.3408,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "疗养院东楼 206 房间钥匙",
+      "category": "钥匙",
+      "value": 300000,
+      "weight": 0.8544,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Chekannaya 15号公寓钥匙",
+      "category": "钥匙",
+      "value": 1298887,
+      "weight": 0.1704,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "原奥地利FAL护木",
+      "category": "零件",
+      "value": 2000,
+      "weight": 211.5133,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "AK-50 防尘盖",
+      "category": "零件",
+      "value": 4339,
+      "weight": 90.2282,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "TKPD 护木 (FDE)",
+      "category": "零件",
+      "value": 8016,
+      "weight": 45.9322,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Glock 9x19 Lone Wolf AlphaWolf螺纹枪管",
+      "category": "零件",
+      "value": 11111,
+      "weight": 32.0732,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "MPX GEN2 8 英寸 M-LOK 护木",
+      "category": "零件",
+      "value": 15000,
+      "weight": 23.0553,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "沙漠之鹰L6 .50 AE 152毫米枪管（白色虎纹）",
+      "category": "零件",
+      "value": 20000,
+      "weight": 16.8011,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Krebs Custom UFM KeyMod AK 护木",
+      "category": "零件",
+      "value": 28969,
+      "weight": 11.1775,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "10.5 英寸 P90 枪管 5.7x28",
+      "category": "零件",
+      "value": 39000,
+      "weight": 8.0593,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "US Palm AK手枪式握把",
+      "category": "零件",
+      "value": 55555,
+      "weight": 5.461,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "CMMG Resolute Mk47 7.62x39 Mk47上机匣",
+      "category": "零件",
+      "value": 350000,
+      "weight": 0.7211,
+      "qty": [
+        1,
+        1
+      ]
+    },
+    {
+      "name": "方便面",
+      "category": "食物",
+      "value": 7776,
+      "weight": 47.494,
+      "qty": [
+        1,
+        4
+      ]
+    },
+    {
+      "name": "罐装热棒能量饮料",
+      "category": "食物",
+      "value": 15000,
+      "weight": 23.0553,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "豌豆罐头",
+      "category": "食物",
+      "value": 17777,
+      "weight": 19.1261,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "罐装六可乐",
+      "category": "食物",
+      "value": 19000,
+      "weight": 17.7763,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "罐装塔可乐汽水",
+      "category": "食物",
+      "value": 22927,
+      "weight": 14.4574,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Aquamari带滤嘴水瓶",
+      "category": "食物",
+      "value": 23999,
+      "weight": 13.7486,
+      "qty": [
+        1,
+        3
+      ]
+    },
+    {
+      "name": "Alyonka 巧克力",
+      "category": "食物",
+      "value": 27000,
+      "weight": 12.0773,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "炖牛肉罐头",
+      "category": "食物",
+      "value": 31000,
+      "weight": 10.3746,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "法国面包房特产法棍",
+      "category": "食物",
+      "value": 38947,
+      "weight": 8.0714,
+      "qty": [
+        1,
+        2
+      ]
+    },
+    {
+      "name": "“凶狠跑刀崽”私酒",
+      "category": "食物",
+      "value": 229999,
+      "weight": 1.1444,
+      "qty": [
+        1,
+        1
+      ]
+    }
+  ]
+}

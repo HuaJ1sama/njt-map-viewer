@@ -1,0 +1,1236 @@
+:root {
+  --bg: #0b0d10;
+  --panel: rgba(16, 19, 24, 0.84);
+  --panel-solid: rgba(16, 19, 24, 0.95);
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #e9e5dd;
+  --muted: #a49c93;
+  --accent: #ffd166;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.view {
+  position: fixed;
+  inset: 0;
+}
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(52, 62, 74, 0.35), rgba(8, 10, 13, 0.95) 70%),
+    var(--bg);
+}
+
+.stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.map-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  -webkit-user-drag: none;
+}
+
+#map-full {
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+#map-full.is-loaded {
+  opacity: 1;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+#overview-viewport {
+  background: #06080b;
+}
+
+/* 主界面：背后一层虚化的地图作为背景，前面地图本体加圆角与投影 */
+.overview-backdrop {
+  position: absolute;
+  inset: -8%;
+  background-position: center;
+  background-size: cover;
+  filter: blur(46px) brightness(0.4) saturate(1.15);
+  transform: scale(1.06);
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+#overview-stage {
+  border-radius: 10px;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.72),
+    0 0 0 1px rgba(255, 255, 255, 0.07),
+    0 0 70px rgba(120, 170, 255, 0.07);
+}
+
+#overview-stage .map-img {
+  border-radius: 10px;
+}
+
+/* ---------- 工具栏 ---------- */
+
+.toolbar {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  padding: 9px 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  transition: opacity 320ms ease;
+}
+
+.toolbar-left {
+  left: 18px;
+  top: 18px;
+  align-items: center;
+}
+
+.toolbar-right {
+  right: 18px;
+  top: 18px;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#side-column {
+  position: absolute;
+  right: 18px;
+  top: 64px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  max-height: calc(100% - 36px);
+}
+
+/* ---------- 右侧面板显隐开关 ---------- */
+
+.ui-toggle {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  z-index: 12;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: inherit;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  opacity: 0.5;
+  transition: opacity 200ms ease, background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.ui-toggle:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.ui-toggle.active {
+  opacity: 0.72;
+  color: var(--accent);
+  border-color: rgba(255, 209, 102, 0.55);
+  background: rgba(255, 209, 102, 0.16);
+}
+
+body.ui-idle .ui-toggle {
+  opacity: 0.28;
+}
+
+body.ui-idle .ui-toggle:hover {
+  opacity: 1;
+}
+
+body.ui-idle .ui-toggle.active {
+  opacity: 0.5;
+}
+
+/* 收起状态：右侧整块 UI 让位给地图 */
+body.ui-right-hidden #side-column,
+body.ui-right-hidden #overview-actions,
+body.ui-right-hidden #calibration-panel {
+  display: none;
+}
+
+.toolbar-block {
+  position: static;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+#overview-actions {
+  top: 64px;
+  align-items: center;
+  gap: 12px;
+}
+
+body.ui-idle .toolbar {
+  opacity: 0.14;
+}
+
+body.ui-idle .toolbar:hover,
+body.ui-idle #calibration-panel:hover {
+  opacity: 1;
+}
+
+/* 大地图平时只留地图本身，鼠标不动时连按钮都收起来 */
+body.ui-idle #overview-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.group + .group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  padding: 8px 11px;
+  border-radius: 9px;
+  cursor: pointer;
+  min-width: 38px;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1508;
+}
+
+.btn.danger:hover {
+  background: rgba(255, 90, 90, 0.24);
+  border-color: rgba(255, 120, 120, 0.5);
+}
+
+.btn:disabled {
+  opacity: 0.34;
+  cursor: default;
+}
+
+.btn-icon {
+  min-width: 28px;
+  padding: 4px 7px;
+}
+
+.tool {
+  font-size: 17px;
+  padding: 7px 10px;
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch.active {
+  border-color: #fff;
+  transform: scale(1.1);
+}
+
+.width-btn {
+  min-width: 30px;
+  padding: 8px 6px;
+}
+
+.width-btn i {
+  display: block;
+  margin: 0 auto;
+  border-radius: 4px;
+  background: currentColor;
+}
+
+.title {
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  padding: 0 4px;
+}
+
+.badge {
+  font-size: 12px;
+  color: #151109;
+  background: var(--accent);
+  border-radius: 7px;
+  padding: 4px 8px;
+}
+
+/* ---------- 大地图 ---------- */
+
+.status {
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  z-index: 5;
+  display: flex;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 11px;
+}
+
+.status .sep {
+  opacity: 0.5;
+}
+
+/* ---------- 热点 ---------- */
+
+.hotspot {
+  cursor: pointer;
+}
+
+.hotspot .frame {
+  fill: rgba(255, 209, 102, 0);
+  stroke: rgba(255, 209, 102, 0);
+  stroke-width: 2;
+  transition: fill 140ms ease, stroke 140ms ease;
+}
+
+.hotspot:hover .frame,
+.hotspot.is-hover .frame {
+  fill: rgba(255, 224, 150, 0.18);
+  stroke: rgba(255, 209, 102, 0.92);
+  filter: drop-shadow(0 0 10px rgba(255, 209, 102, 0.45));
+}
+
+.hotspot.is-calibrating .frame {
+  fill: rgba(255, 255, 255, 0.05);
+  stroke: rgba(255, 209, 102, 0.6);
+  stroke-dasharray: 7 5;
+}
+
+.hotspot .ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0);
+  stroke-width: 3;
+  transition: stroke 160ms ease, r 160ms ease;
+}
+
+.hotspot .dot {
+  fill: rgba(255, 255, 255, 0);
+  stroke: rgba(255, 255, 255, 0.45);
+  stroke-width: 1.4;
+}
+
+.hotspot .label {
+  opacity: 0;
+  transition: opacity 140ms ease;
+  pointer-events: none;
+}
+
+.hotspot .label rect {
+  fill: rgba(6, 8, 11, 0.74);
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 1;
+}
+
+.hotspot .label text {
+  fill: #f0ece4;
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-size: 22px;
+  dominant-baseline: middle;
+}
+
+.hotspot:hover .ring,
+.hotspot.is-hover .ring,
+.hotspot.is-calibrating .ring {
+  stroke: var(--accent);
+}
+
+.hotspot:hover .dot,
+.hotspot.is-hover .dot {
+  fill: rgba(255, 209, 102, 0.55);
+  stroke: var(--accent);
+}
+
+.hotspot:hover .label,
+.hotspot.is-hover .label,
+.hotspot.is-custom .label,
+.hotspot.is-calibrating .label {
+  opacity: 1;
+}
+
+.hotspot.is-custom .ring {
+  stroke: rgba(255, 255, 255, 0.34);
+}
+
+.hotspot.is-custom .dot {
+  fill: rgba(232, 228, 220, 0.88);
+  stroke: rgba(255, 255, 255, 0.5);
+}
+
+.hotspot.is-calibrating {
+  cursor: grab;
+}
+
+.hotspot.is-calibrating .dot {
+  fill: var(--accent);
+  stroke: #fff;
+}
+
+.hotspot.is-dragging {
+  cursor: grabbing;
+}
+
+.hotspot .label .badge-text {
+  fill: #d8c99a;
+  font-size: 15px;
+}
+
+/* ---------- 面板 / 提示 ---------- */
+
+.panel {
+  position: absolute;
+  right: 18px;
+  top: 128px;
+  z-index: 7;
+  width: 320px;
+  max-height: calc(100% - 130px);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 13px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+.panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14.5px;
+  letter-spacing: 0.06em;
+}
+
+.panel-hint {
+  margin: 8px 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+}
+
+.panel li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  color: #ddd7cd;
+}
+
+.panel li code {
+  color: #8f877e;
+  font-size: 11.5px;
+}
+
+.panel li.is-active {
+  background: rgba(255, 209, 102, 0.16);
+}
+
+.panel footer {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%);
+  z-index: 9;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- 任务框 ---------- */
+
+/* ---------- scav 宝箱 ---------- */
+
+.bottom-bar {
+  position: absolute;
+  left: 18px;
+  bottom: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 复制到剪贴板时把界面元素藏起来，只留地图 */
+body.capture-mode .toolbar,
+body.capture-mode .ui-toggle,
+body.capture-mode .bottom-bar,
+body.capture-mode .credit,
+body.capture-mode .status,
+body.capture-mode #recent-bar,
+body.capture-mode #calibration-panel,
+body.capture-mode .toast {
+  opacity: 0 !important;
+}
+
+/* ---------- 最近浏览 ---------- */
+
+.recent-bar {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  transition: opacity 300ms ease;
+}
+
+.recent-label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.recent-toggle {
+  min-width: 26px;
+  padding: 3px 6px;
+}
+
+.recent-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recent-chip {
+  padding: 5px 10px;
+  font-size: 12.5px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+
+.recent-chip:hover {
+  background: rgba(255, 209, 102, 0.2);
+}
+
+body.ui-idle .recent-bar {
+  opacity: 0.3;
+}
+
+body.ui-idle .recent-bar:hover {
+  opacity: 1;
+}
+
+.scav-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 15px;
+  border-radius: 13px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  opacity: 0.78;
+  transition: opacity 300ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.scav-button:hover {
+  opacity: 1;
+  background: rgba(255, 209, 102, 0.18);
+  transform: translateY(-1px);
+}
+
+body.ui-idle .scav-button {
+  opacity: 0.3;
+}
+
+body.ui-idle .scav-button:hover {
+  opacity: 1;
+}
+
+/* ---------- 右下角署名 ---------- */
+
+.credit {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+  font-size: 12.5px;
+  color: var(--muted);
+  transition: opacity 320ms ease;
+}
+
+/* 只在主界面（大地图）显示：地区地图右侧是整列面板，右下角腾不出位置 */
+body[data-view="map"] .credit {
+  display: none;
+}
+
+body.ui-idle .credit {
+  opacity: 0.3;
+}
+
+body.ui-idle .credit:hover {
+  opacity: 1;
+}
+
+.credit-name {
+  color: #f1ece3;
+  letter-spacing: 0.04em;
+}
+
+.credit-version {
+  opacity: 0.8;
+}
+
+.credit-dot {
+  opacity: 0.45;
+}
+
+.credit-link {
+  color: #ffd166;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(255, 209, 102, 0.45);
+  cursor: pointer;
+}
+
+.credit-link:hover {
+  color: #ffe0a3;
+  border-bottom-color: rgba(255, 224, 163, 0.9);
+}
+
+.dance-card {
+  max-width: min(84vw, 820px);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.65);
+}
+
+.dance-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dance-gif {
+  display: block;
+  width: min(640px, 82vw);
+  max-width: 100%;
+  height: auto;
+  max-height: 72vh;
+  border-radius: 12px;
+  background: #0a0c10;
+}
+
+.dance-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scav-icon {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.scav-label {
+  font-size: 13.5px;
+  letter-spacing: 0.08em;
+}
+
+.scav-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 6, 9, 0.62);
+  backdrop-filter: blur(3px);
+}
+
+.scav-card {
+  width: 470px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px 14px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.65);
+}
+
+.scav-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scav-title {
+  font-size: 17px;
+  letter-spacing: 0.14em;
+}
+
+.scav-sub {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.scav-sub b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.scav-loot {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.scav-loot.rolling {
+  opacity: 0.25;
+  filter: blur(2px);
+}
+
+.scav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.045);
+  font-size: 13px;
+}
+
+.scav-item.rarity-good {
+  background: rgba(90, 169, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(90, 169, 255, 0.3);
+}
+
+.scav-item.rarity-rare {
+  background: rgba(255, 209, 102, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.45);
+}
+
+.scav-cat {
+  flex: none;
+  font-size: 11px;
+  color: #10131a;
+  background: rgba(233, 229, 221, 0.78);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+.scav-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scav-unit {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.scav-subtotal {
+  flex: none;
+  width: 84px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.scav-total {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.scav-total strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.scav-profit {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.scav-profit.up {
+  color: #7ee0a8;
+}
+
+.scav-profit.down {
+  color: #ff9090;
+}
+
+.scav-again {
+  padding: 10px 0;
+  font-size: 14.5px;
+  letter-spacing: 0.05em;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1508;
+}
+
+.scav-again:hover {
+  background: #ffdb85;
+}
+
+.scav-note {
+  margin: 0;
+  font-size: 11px;
+  color: #6f6960;
+}
+
+#task-panel {
+  width: 248px;
+  gap: 8px;
+  background: var(--panel);
+}
+
+#task-panel.is-empty .panel-head {
+  display: none;
+}
+
+/* 没有任务时只留一个方形加号按钮，面板收窄贴右边 */
+#task-panel.is-empty {
+  align-self: flex-end;
+  padding: 6px;
+}
+
+#task-panel.is-empty .task-add {
+  width: 40px;
+  font-size: 17px;
+  padding: 7px 0;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 38vh;
+  overflow: auto;
+}
+
+.task-list:empty {
+  display: none;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.task-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.task-row.is-active {
+  background: rgba(255, 209, 102, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(255, 209, 102, 0.45);
+}
+
+.task-row.is-hidden .task-name {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.task-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.task-name {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.task-note {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-row.is-hidden .task-note {
+  opacity: 0.45;
+}
+
+.task-count {
+  font-size: 10.5px;
+  color: var(--muted);
+  flex: none;
+}
+
+.task-btn {
+  min-width: 22px;
+  padding: 3px 4px;
+  font-size: 11.5px;
+  flex: none;
+}
+
+.task-btn.danger {
+  background: rgba(255, 90, 90, 0.28);
+  border-color: rgba(255, 120, 120, 0.55);
+}
+
+.task-add {
+  flex: 2;
+  font-size: 15px;
+  padding: 6px 0;
+  letter-spacing: 0.06em;
+}
+
+.task-actions {
+  display: flex;
+  gap: 6px;
+}
+
+#btn-task-undo {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.task-add.framing {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1508;
+}
+
+.task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.task-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+}
+
+.task-input:focus {
+  outline: none;
+  border-color: rgba(255, 209, 102, 0.7);
+}
+
+.task-colors {
+  gap: 6px;
+}
+
+.task-colors .swatch {
+  width: 18px;
+  height: 18px;
+}
+
+.task-form-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.task-form-actions .btn {
+  flex: 1;
+}
+
+#task-hint {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.task-box .task-frame {
+  stroke-width: 2;
+}
+
+.selection-box {
+  fill: none;
+  stroke: #ffd166;
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+  pointer-events: none;
+}
+
+#shape-layer.is-hidden {
+  display: none;
+}
+
+.task-label text {
+  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  font-weight: 600;
+  fill: #15110a;
+}
+
+.task-label .task-label-bg {
+  stroke: rgba(0, 0, 0, 0.35);
+  stroke-width: 0.5;
+}
+
+/* ---------- 光标 ---------- */
+
+/* ---------- 启动加载页 ---------- */
+
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 42%, #1b222c, #07090c 72%);
+  transition: opacity 400ms ease;
+}
+
+.loading.done {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: min(560px, 78vw);
+}
+
+.loading-gif {
+  width: min(430px, 68vw);
+  border-radius: 12px;
+  background: #0a0c10;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+}
+
+.loading-gif:not([src]) {
+  display: none;
+}
+
+.loading-title {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: 0.22em;
+  color: #f1ece3;
+}
+
+.loading-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.loading-fill {
+  width: 0;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #ffd166, #ffb347);
+  transition: width 260ms ease;
+}
+
+.loading-text {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.loading-hint {
+  margin: 0;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  color: rgba(178, 186, 196, 0.55);
+}
+
+body[data-view="map"][data-tool="pan"] #map-viewport {
+  cursor: grab;
+}
+
+body[data-view="map"].is-panning #map-viewport {
+  cursor: grabbing;
+}
+
+body[data-view="map"].is-drawing #map-viewport {
+  cursor: crosshair;
+}
+
+body[data-view="map"].is-moving-shape #map-viewport {
+  cursor: move;
+}
+
+body[data-view="map"][data-tool="select"] #map-viewport {
+  cursor: default;
+}
+
+body[data-view="map"].is-framing #map-viewport {
+  cursor: crosshair;
+}

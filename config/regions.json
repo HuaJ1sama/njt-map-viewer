@@ -1,0 +1,262 @@
+{
+  "version": 1,
+  "hotspotRadius": 22,
+  "extras": {
+    "danceGif": "沙皇.gif",
+    "danceDisplay": "maps/dance.webp",
+    "splashImage": "icon-source.jpg"
+  },
+  "overview": {
+    "id": "nwsk",
+    "name": "诺文斯克",
+    "subtitle": "PVE 区域",
+    "image": "诺文斯克.jpg",
+    "preview": "previews/nwsk.webp",
+    "display": "previews/nwsk@2x.webp",
+    "space": "crop1",
+    "crop": [
+      0,
+      56,
+      1220,
+      866
+    ],
+    "polish": "medium"
+  },
+  "regions": [
+    {
+      "id": "lab",
+      "name": "实验室",
+      "image": "实验室.jpg",
+      "preview": "previews/lab.webp",
+      "hotspot": [
+        0.6131,
+        0.1155
+      ],
+      "label": [
+        -22,
+        -22,
+        182,
+        44
+      ],
+      "custom": false,
+      "display": "maps/lab.webp"
+    },
+    {
+      "id": "groundzero",
+      "name": "中心区",
+      "image": "中心区.jpg",
+      "preview": "previews/groundzero.webp",
+      "hotspot": [
+        0.6656,
+        0.1917
+      ],
+      "label": [
+        -24,
+        -22,
+        140,
+        44
+      ],
+      "custom": false,
+      "display": "maps/groundzero.webp"
+    },
+    {
+      "id": "forest",
+      "name": "森林",
+      "image": "森林.jpg",
+      "preview": "previews/forest.webp",
+      "hotspot": [
+        0.4074,
+        0.2829
+      ],
+      "label": [
+        -24,
+        -22,
+        107,
+        44
+      ],
+      "custom": false,
+      "display": "maps/forest.webp"
+    },
+    {
+      "id": "streets",
+      "name": "塔科夫街区",
+      "image": "街区.jpg",
+      "preview": "previews/streets.webp",
+      "hotspot": [
+        0.5902,
+        0.3326
+      ],
+      "label": [
+        -24,
+        -22,
+        205,
+        44
+      ],
+      "custom": false,
+      "display": "maps/streets.webp"
+    },
+    {
+      "id": "factory",
+      "name": "工厂",
+      "image": "工厂.jpg",
+      "preview": "previews/factory.webp",
+      "hotspot": [
+        0.4189,
+        0.4642
+      ],
+      "label": [
+        -24,
+        -22,
+        73,
+        44
+      ],
+      "custom": false,
+      "display": "maps/factory.webp"
+    },
+    {
+      "id": "customs",
+      "name": "海关",
+      "image": "海关.jpg",
+      "preview": "previews/customs.webp",
+      "hotspot": [
+        0.5336,
+        0.5243
+      ],
+      "label": [
+        -66,
+        -18,
+        132,
+        36
+      ],
+      "custom": false,
+      "display": "maps/customs.jpg"
+    },
+    {
+      "id": "lighthouse",
+      "name": "灯塔",
+      "image": "灯塔.jpg",
+      "preview": "previews/lighthouse.webp",
+      "hotspot": [
+        0.1148,
+        0.5381
+      ],
+      "label": [
+        -24,
+        -22,
+        105,
+        44
+      ],
+      "custom": false,
+      "display": "maps/lighthouse.webp"
+    },
+    {
+      "id": "reserve",
+      "name": "储备站",
+      "image": "储备站.jpg",
+      "preview": "previews/reserve.webp",
+      "hotspot": [
+        0.3213,
+        0.582
+      ],
+      "label": [
+        -24,
+        -22,
+        139,
+        44
+      ],
+      "custom": false,
+      "display": "maps/reserve.webp"
+    },
+    {
+      "id": "interchange",
+      "name": "立交桥",
+      "image": "立交桥.png",
+      "preview": "previews/interchange.webp",
+      "hotspot": [
+        0.582,
+        0.6478
+      ],
+      "label": [
+        -24,
+        -22,
+        137,
+        44
+      ],
+      "custom": false,
+      "display": "maps/interchange.webp"
+    },
+    {
+      "id": "shoreline",
+      "name": "海岸线",
+      "image": "海岸线.jpg",
+      "preview": "previews/shoreline.webp",
+      "hotspot": [
+        0.1975,
+        0.7206
+      ],
+      "label": [
+        -24,
+        -22,
+        143,
+        44
+      ],
+      "custom": false,
+      "display": "maps/shoreline.webp"
+    },
+    {
+      "id": "port",
+      "name": "码头",
+      "image": "码头.png",
+      "preview": "previews/port.webp",
+      "hotspot": [
+        0.2557,
+        0.8915
+      ],
+      "label": [
+        -26,
+        -22,
+        100,
+        44
+      ],
+      "custom": false,
+      "badge": "暂不可用",
+      "display": "maps/port.webp"
+    },
+    {
+      "id": "icebreaker",
+      "name": "破冰船",
+      "image": "破冰船.jpg",
+      "preview": "previews/icebreaker.webp",
+      "hotspot": [
+        0.1025,
+        0.2991
+      ],
+      "label": [
+        -28,
+        -24,
+        154,
+        48
+      ],
+      "custom": true,
+      "display": "maps/icebreaker.webp"
+    },
+    {
+      "id": "labyrinth",
+      "name": "迷宫",
+      "image": "迷宫.jpg",
+      "preview": "previews/labyrinth.webp",
+      "hotspot": [
+        0.1992,
+        0.6259
+      ],
+      "label": [
+        -28,
+        -24,
+        154,
+        48
+      ],
+      "custom": true,
+      "display": "maps/labyrinth.webp"
+    }
+  ]
+}

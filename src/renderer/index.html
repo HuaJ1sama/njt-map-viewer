@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self' njt:; img-src 'self' njt: data: blob:; connect-src 'self' njt: data:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>尼沙皇版图浏览小工具</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body data-view="overview">
+    <div id="loading" class="loading">
+      <div class="loading-card">
+        <img id="loading-gif" class="loading-gif" alt="" />
+        <h1 class="loading-title">尼沙皇版图浏览小工具</h1>
+        <div class="loading-bar"><div id="loading-fill" class="loading-fill"></div></div>
+        <p id="loading-text" class="loading-text">正在启动…</p>
+        <p id="loading-hint" class="loading-hint">单击或按任意键跳过</p>
+      </div>
+    </div>
+
+    <button id="btn-ui-toggle" class="ui-toggle" type="button" title="隐藏右侧面板 (H)">
+      <span aria-hidden="true">☰</span>
+    </button>
+
+    <section id="view-overview" class="view">
+      <div id="overview-viewport" class="viewport">
+        <div id="overview-backdrop" class="overview-backdrop"></div>
+        <div id="overview-stage" class="stage">
+          <img id="overview-img" class="map-img" alt="诺文斯克大地图" draggable="false" />
+          <svg id="overview-svg" class="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="地区热点">
+            <g id="overview-hotspot-layer"></g>
+            <g id="overview-task-layer"></g>
+          </svg>
+        </div>
+      </div>
+
+      <div id="overview-actions" class="toolbar toolbar-right">
+        <button id="btn-calibrate" class="btn" type="button">校准热区</button>
+        <button id="btn-copy-overview" class="btn" type="button" title="把当前画面复制到剪贴板">📋 复制视图</button>
+      </div>
+
+      <div id="recent-bar" class="recent-bar hidden">
+        <span class="recent-label">最近</span>
+        <button id="btn-recent-toggle" class="btn btn-icon recent-toggle" type="button" title="启动时回到上次看的地图">⟲</button>
+        <div id="recent-list" class="recent-list"></div>
+      </div>
+
+      <aside id="calibration-panel" class="panel hidden">
+        <header>
+          <span>热区校准</span>
+          <button id="btn-close-calibration" class="btn btn-icon" type="button" aria-label="关闭">✕</button>
+        </header>
+        <p class="panel-hint">直接在地图上拖动圆点调整位置，改动会自动保存，下次打开依然生效。</p>
+        <ul id="calibration-list"></ul>
+        <footer>
+          <button id="btn-reset-hotspots" class="btn" type="button">恢复默认位置</button>
+        </footer>
+      </aside>
+
+      <div class="bottom-bar">
+        <button id="btn-scav" class="scav-button" type="button" title="scav 宝箱：花 95000 卢布看看 scav 带回了什么">
+          <span class="scav-icon">🎁</span>
+          <span class="scav-label">scav宝箱</span>
+        </button>
+        <button id="btn-dance" class="scav-button" type="button" title="播放尼沙皇跳舞">
+          <span class="scav-icon">🕺</span>
+          <span class="scav-label">尼沙皇跳舞</span>
+        </button>
+      </div>
+
+      <div class="credit">
+        <span class="credit-name">尼沙皇版图浏览小工具</span>
+        <span id="credit-version" class="credit-version"></span>
+        <span class="credit-dot">·</span>
+        <span>作者：<a id="credit-author" class="credit-link" href="https://space.bilibili.com/500638825?spm_id_from=333.1007.0.0">一只非常屑的彩虹滑稽</a></span>
+      </div>
+
+      <div id="scav-modal" class="scav-modal hidden">
+        <div class="scav-card">
+          <header>
+            <span class="scav-title">scav 宝箱</span>
+            <button id="btn-scav-close" class="btn btn-icon" type="button" aria-label="关闭">✕</button>
+          </header>
+          <p class="scav-sub">
+            花费 <b id="scav-cost">₽95,000</b> · 第 <span id="scav-roll-no">1</span> 次开箱 · 本次会话最高
+            <span id="scav-best">₽0</span>
+          </p>
+          <ul id="scav-loot" class="scav-loot"></ul>
+          <div class="scav-total">
+            <span>scav 带回的物资总价值</span>
+            <strong id="scav-total">₽0</strong>
+            <span id="scav-profit" class="scav-profit">₽0</span>
+          </div>
+          <button id="btn-scav-again" class="btn scav-again" type="button">再来95000卢布的</button>
+          <p id="scav-note" class="scav-note">物资与价格参考游戏 wiki 里的常见物品，数值仅供娱乐。</p>
+        </div>
+      </div>
+
+      <div id="dance-modal" class="scav-modal hidden">
+        <div class="dance-card">
+          <header>
+            <span class="scav-title">尼沙皇跳舞</span>
+            <button id="btn-dance-close" class="btn btn-icon" type="button" aria-label="关闭">✕</button>
+          </header>
+          <img id="dance-gif" class="dance-gif" alt="尼沙皇跳舞" />
+          <div class="dance-actions">
+            <button id="btn-dance-replay" class="btn" type="button">重播一遍</button>
+            <span class="scav-note">ESC 或点空白处关掉</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="view-map" class="view hidden">
+      <div id="map-viewport" class="viewport">
+        <div id="map-stage" class="stage">
+          <img id="map-preview" class="map-img" alt="" draggable="false" />
+          <img id="map-full" class="map-img is-full" alt="" draggable="false" />
+          <svg id="map-svg" class="overlay" xmlns="http://www.w3.org/2000/svg" aria-label="标注与任务层">
+            <g id="shape-layer"></g>
+            <g id="task-layer"></g>
+          </svg>
+        </div>
+      </div>
+
+      <header id="map-header" class="toolbar toolbar-left">
+        <button id="btn-back" class="btn" type="button">← 返回大地图</button>
+        <span id="map-title" class="title">地区</span>
+        <span id="map-badge" class="badge hidden"></span>
+      </header>
+
+      <div id="side-column">
+        <div id="tools" class="toolbar toolbar-block">
+          <div class="group" id="tool-group">
+            <button class="btn tool" data-tool="pan" type="button" title="移动 (V)">✋</button>
+            <button class="btn tool" data-tool="select" type="button" title="选择 / 拖动单条标注 (S)">✥</button>
+            <button class="btn tool" data-tool="ellipse" type="button" title="画圆 (C)">◯</button>
+            <button class="btn tool" data-tool="rect" type="button" title="画方框 (R)">▭</button>
+            <button class="btn tool" data-tool="arrow" type="button" title="画箭头 (A)">↗</button>
+            <button class="btn tool" data-tool="pen" type="button" title="自由画笔 (P)">✎</button>
+          </div>
+          <div class="group" id="color-group"></div>
+          <div class="group" id="width-group"></div>
+          <div class="group">
+            <button id="btn-undo" class="btn" type="button" title="撤销 (Ctrl+Z)">↶</button>
+            <button id="btn-redo" class="btn" type="button" title="重做 (Ctrl+Y)">↷</button>
+            <button id="btn-delete-shape" class="btn" type="button" title="删除选中的标注 (Delete)" disabled>删除选中</button>
+            <button id="btn-shape-visible" class="btn btn-icon" type="button" title="显示 / 隐藏全部标注">👁</button>
+            <button id="btn-clear" class="btn danger" type="button" title="清空当前地图的全部标注">清空</button>
+          </div>
+          <div class="group">
+            <button id="btn-zoom-out" class="btn" type="button" title="缩小 (-)">−</button>
+            <button id="btn-zoom-in" class="btn" type="button" title="放大 (+)">＋</button>
+            <button id="btn-zoom-100" class="btn" type="button" title="原始像素">100%</button>
+            <button id="btn-fit" class="btn" type="button" title="适合窗口 (Ctrl+0)">适合</button>
+            <button id="btn-fullscreen" class="btn" type="button" title="全屏 (F11)">⛶</button>
+          </div>
+          <div class="group">
+            <button id="btn-copy-view" class="btn" type="button" title="把当前画面复制到剪贴板">📋 复制视图</button>
+          </div>
+        </div>
+
+        <aside id="task-panel" class="toolbar toolbar-block">
+          <header class="panel-head">
+            <span class="panel-title">任务</span>
+            <button id="btn-task-labels" class="btn btn-icon hidden" type="button" title="显示 / 隐藏全部任务名称">👁</button>
+          </header>
+          <ul id="task-list" class="task-list"></ul>
+          <form id="task-form" class="task-form hidden">
+            <input id="task-name" class="task-input" type="text" maxlength="16" placeholder="任务名称" autocomplete="off" />
+            <input id="task-note" class="task-input" type="text" maxlength="16" placeholder="备注（可选），例如 东楼102" autocomplete="off" />
+            <div id="task-colors" class="group task-colors"></div>
+            <div class="task-form-actions">
+              <button id="btn-task-create" class="btn" type="submit">开始框选</button>
+              <button id="btn-task-cancel" class="btn" type="button">取消</button>
+            </div>
+          </form>
+          <div class="task-actions">
+            <button id="btn-task-undo" class="btn hidden" type="button" title="撤销上一次框选 (Ctrl+Z)">↶ 撤销</button>
+            <button id="btn-task-add" class="btn task-add" type="button" title="添加任务">＋</button>
+          </div>
+          <p id="task-hint" class="panel-hint hidden"></p>
+        </aside>
+      </div>
+
+      <div id="map-status" class="status">
+        <span id="zoom-readout">100%</span>
+        <span class="sep">·</span>
+        <span id="map-hint">滚轮缩放，按住左键拖拽平移</span>
+      </div>
+
+    </section>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="js/geom.js"></script>
+    <script src="js/scav.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
