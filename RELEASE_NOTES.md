@@ -41,4 +41,6 @@ npm run dist         # 打包单文件到 dist/
 
 一只非常屑的彩虹滑稽 · [B 站主页](https://space.bilibili.com/500638825?spm_id_from=333.1007.0.0)
 
+代码以 MIT 许可开源，欢迎自取改造。
+
 「Escape from Tarkov」及相关素材、商标归 Battlestate Games 所有；本项目为非商业的个人作品，仅供交流学习。

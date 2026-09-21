@@ -109,7 +109,7 @@ python tools/make-scav-loot.py                # 从 eftarkov.com 重新抓 scav 
 
 - 只做了 Windows，打包用的是 Electron 的 `portable` 单文件目标，其它平台没试过。
 - 单文件版启动要先自解压（约 5～7 秒，期间是那张静态启动图），想秒开就用解压出来的目录版。
-- 地图是静态图片，不是游戏里的实时地图。
+- 地图是静态图片，不是游戏里的实时地图；个别地区标了「暂不可用」。
 - scav 宝箱的物资与价格来自公开快照，出场概率是按价格调过的娱乐数值，不代表游戏里的真实掉落率。
 
 ## 作者
@@ -124,4 +124,6 @@ python tools/make-scav-loot.py                # 从 eftarkov.com 重新抓 scav 
 
 ## 许可
 
-仓库未附开源许可证（`package.json` 里是 `UNLICENSED`）：代码与素材版权归作者所有，转载或二次分发前请先联系作者；只是想拿去玩的话，直接下载 Release 即可。
+代码以 [MIT 许可](LICENSE) 开源：随便用、随便改、随便发，保留版权声明就行。
+
+地图图片与「Escape from Tarkov」相关的素材、商标**不在**这份许可范围内，版权归 Battlestate Games 所有（见上面的免责声明），请不要把仓库或 Release 里的地图素材单独拿去商用。
