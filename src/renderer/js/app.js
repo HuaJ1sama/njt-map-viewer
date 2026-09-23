@@ -8,16 +8,36 @@
   const COLORS = ['#ffd166', '#ff6b6b', '#4dd4ac', '#5aa9ff', '#c792ea', '#ffffff'];
   const TASK_COLORS = ['#ffd166', '#ff8f5a', '#ff6b6b', '#c792ea', '#5aa9ff', '#4dd4ac', '#9ee37d', '#ffffff'];
   const WIDTHS = [2, 4, 7];
+  const TEXT_SIZES = [16, 24, 36];
+  const TEXT_COLOR = 'rgba(6,8,11,0.85)';
+  const DRAW_TOOLS = new Set(['pen', 'rect', 'ellipse', 'arrow']);
   const HINTS = {
     pan: '滚轮缩放，按住左键拖拽平移',
     select: '点选一条标注后可以拖动，Delete 删除',
     ellipse: '按住左键拖拽画圆',
     rect: '按住左键拖拽画方框',
-    arrow: '按住左键从起点拖到终点画箭头',
+    arrow: '按住左键从起点拖到终点画箭头，松手能给箭头标字',
     pen: '按住左键自由涂画',
+    text: '点一下地图写文字，点已有的字可以改',
+    eraser: '按住左键划过要擦掉的标注，一次拖动算一步撤销',
   };
   const IDLE_DELAY = 2500;
   const HOTSPOT_PAD = 8;
+  // 笔被系统提前打断（pointercancel）后的宽限时间：期间再收到按下的移动就续回同一笔
+  const STROKE_GRACE_MS = 500;
+  // 笔落下后这段时间内忽略触摸，避免手掌按住屏幕把笔画抢走
+  const PEN_PRIORITY_MS = 1200;
+  const PEN_LOG_LIMIT = 5000;
+  const PEN_LOG_FLUSH_MS = 5000;
+
+  // 出错时留个记录，远程排查（和自检）可以直接读到
+  window.addEventListener('error', (event) => {
+    window.__njtLastError = `${event.message} @ ${event.filename || ''}:${event.lineno || 0}`;
+  });
+  window.addEventListener('unhandledrejection', (event) => {
+    const reason = event.reason || {};
+    window.__njtLastError = `unhandled rejection: ${reason.message || reason}`;
+  });
 
   const el = {};
   const state = {
@@ -37,6 +57,7 @@
     tool: 'pan',
     color: COLORS[0],
     width: WIDTHS[1],
+    textSize: TEXT_SIZES[1],
     shapes: [],
     tasks: [],
     selectedShapeId: null,
@@ -54,8 +75,22 @@
     taskFormColor: TASK_COLORS[0],
     previewBox: null,
     hotspots: new Map(),
-    pointers: { mode: null, lastX: 0, lastY: 0 },
+    pointers: {
+      mode: null,
+      lastX: 0,
+      lastY: 0,
+      pointerId: null,
+      pointerType: null,
+      lastEventAt: 0,
+      interrupted: false,
+      shapeId: null,
+      boxHit: null,
+      moved: false,
+    },
     pendingBefore: null,
+    pendingArrowId: null,
+    editor: null,
+    penLogEnabled: false,
     calibration: false,
     drag: null,
     spacePan: false,
@@ -101,8 +136,20 @@
     if (metaCache.has(url)) return metaCache.get(url);
     const promise = new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve({ url, w: img.naturalWidth, h: img.naturalHeight });
-      img.onerror = () => reject(new Error(`图片加载失败：${url}`));
+      let settled = false;
+      const finish = (run) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        run();
+      };
+      // 兜底：卡住的图片请求不能把打开地图这一步挂死
+      const timer = setTimeout(() => {
+        metaCache.delete(url);
+        finish(() => reject(new Error(`图片加载超时：${url}`)));
+      }, 12000);
+      img.onload = () => finish(() => resolve({ url, w: img.naturalWidth, h: img.naturalHeight }));
+      img.onerror = () => finish(() => reject(new Error(`图片加载失败：${url}`)));
       img.src = url;
     });
     metaCache.set(url, promise);
@@ -139,6 +186,137 @@
         document.body.classList.add('ui-idle');
       }
     }, IDLE_DELAY);
+  }
+
+  /* ---------------- 笔输入取证日志（只有 --penlog 启动时才记） ---------------- */
+
+  const PEN_LOG_TYPES = [
+    'pointerdown',
+    'pointermove',
+    'pointerup',
+    'pointercancel',
+    'gotpointercapture',
+    'lostpointercapture',
+    'pointerleave',
+    'contextmenu',
+  ];
+  const penLog = { enabled: false, entries: [], batches: 0, timer: 0 };
+
+  function penLogSummary() {
+    const counts = {};
+    for (const entry of penLog.entries) {
+      const key = `${entry.type}:${entry.pointerType || '-'}`;
+      counts[key] = (counts[key] || 0) + 1;
+    }
+    const cancels = penLog.entries.filter((entry) => entry.type === 'pointercancel').length;
+    const downs = penLog.entries.filter((entry) => entry.type === 'pointerdown' && entry.pointerType === 'pen').length;
+    return { count: penLog.entries.length, penDown: downs, penCancel: cancels, counts };
+  }
+
+  function recordPenEvent(event) {
+    if (!penLog.enabled) return;
+    try {
+      penLog.entries.push({
+        t: Math.round(performance.now()),
+        wall: new Date().toISOString(),
+        type: event.type,
+        pointerType: event.pointerType || '',
+        pointerId: typeof event.pointerId === 'number' ? event.pointerId : null,
+        button: typeof event.button === 'number' ? event.button : null,
+        buttons: typeof event.buttons === 'number' ? event.buttons : null,
+        pressure: Number(event.pressure) || 0,
+        isPrimary: event.isPrimary !== false,
+        target: event.target && event.target.id ? event.target.id : event.target ? event.target.tagName : '',
+        x: Math.round(event.clientX || 0),
+        y: Math.round(event.clientY || 0),
+        mode: state.pointers.mode,
+        tool: state.tool,
+      });
+    } catch {
+      /* 日志本身不能影响画图 */
+    }
+    if (penLog.entries.length > PEN_LOG_LIMIT) penLog.entries.splice(0, penLog.entries.length - PEN_LOG_LIMIT);
+  }
+
+  async function flushPenLog(force) {
+    if (!penLog.enabled) return null;
+    if (!force && !penLog.entries.length) return null;
+    try {
+      const result = await api.savePenLog({
+        savedAt: new Date().toISOString(),
+        appVersion: el.creditVersion ? el.creditVersion.textContent : '',
+        region: state.regionId,
+        tool: state.tool,
+        summary: penLogSummary(),
+        entries: penLog.entries.slice(),
+      });
+      penLog.batches += 1;
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
+  function startPenLog() {
+    if (penLog.enabled) return;
+    penLog.enabled = true;
+    state.penLogEnabled = true;
+    for (const type of PEN_LOG_TYPES) window.addEventListener(type, recordPenEvent, true);
+    penLog.timer = setInterval(() => {
+      flushPenLog(false);
+    }, PEN_LOG_FLUSH_MS);
+    showToast('已在记录笔的指针事件，写完去用户目录看 pen-log.json', 3200);
+  }
+
+  /* ---------------- 更新公告 ---------------- */
+
+  const announcement = { open: false };
+
+  /** 打开公告弹窗（手动点「公告」按钮也走这里）。 */
+  function openAnnouncement() {
+    const data = state.config && state.config.announcements;
+    if (!data || !data.version || !Array.isArray(data.items) || !data.items.length) return false;
+    el.announceTitle.textContent = data.title || `v${data.version} 更新公告`;
+    el.announceList.textContent = '';
+    for (const item of data.items) {
+      const li = document.createElement('li');
+      li.textContent = String(item);
+      el.announceList.append(li);
+    }
+    el.announceMute.checked = prefs.announcement.muted;
+    announcement.open = true;
+    el.announceModal.classList.remove('hidden');
+    clearTimeout(idleTimer);
+    document.body.classList.remove('ui-idle');
+    return true;
+  }
+
+  /** 有新版本公告就弹一次；勾过「不再提醒」或这个版本已经看过了就不弹。 */
+  function maybeShowAnnouncement() {
+    const data = state.config && state.config.announcements;
+    if (!data || !data.version) return false;
+    if (prefs.announcement.muted) return false;
+    if (prefs.announcement.seen === data.version) return false;
+    return openAnnouncement();
+  }
+
+  /** 右下角版本旁边的「公告」按钮：随时手动看一遍。 */
+  function showAnnouncementManually() {
+    if (!openAnnouncement()) showToast('这个版本没有公告内容');
+  }
+
+  function closeAnnouncement() {
+    if (!announcement.open) return false;
+    const data = state.config && state.config.announcements;
+    const muted = Boolean(el.announceMute.checked);
+    announcement.open = false;
+    el.announceModal.classList.add('hidden');
+    if (data && data.version) prefs.announcement.seen = data.version;
+    if (muted) prefs.announcement.muted = true;
+    savePrefs();
+    if (muted) showToast('以后不再提醒更新公告', 2400);
+    pokeToolbars();
+    return true;
   }
 
   /* ---------------- 尼沙皇跳舞 ---------------- */
@@ -179,7 +357,7 @@
 
   const scav = { open: false, rollNo: 0, best: 0, last: null };
   const ui = { rightHidden: false };
-  const prefs = { lastView: null, recentRegions: [], restoreLast: true };
+  const prefs = { lastView: null, recentRegions: [], restoreLast: true, announcement: { seen: '', muted: false } };
   const overview = { s: 1, tx: 0, ty: 0, fit: 1, min: 1, max: 6 };
   const overviewPointer = { active: false, moved: false, lastX: 0, lastY: 0 };
 
@@ -190,6 +368,7 @@
       lastView: prefs.lastView,
       recentRegions: prefs.recentRegions,
       restoreLast: prefs.restoreLast,
+      announcement: { seen: prefs.announcement.seen, muted: prefs.announcement.muted },
     });
   }
 
@@ -727,11 +906,23 @@
     el.overviewImg.src = assetUrl(overview.display);
     el.overviewBackdrop.style.backgroundImage = `url("${assetUrl(overview.display)}")`;
     setLoading(88, '正在加载大地图…');
+    window.__njtInitStage = 'overview:image';
     await Promise.race([waitImage(el.overviewImg, 9000), new Promise((resolve) => setTimeout(resolve, 9000))]);
     setLoading(96, '正在布置地区热点…');
     renderHotspots();
     fitOverview();
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // 等两帧让首屏铺开；窗口被遮挡/重载时 rAF 可能一直不触发，所以留个兜底超时，别把启动卡死
+    window.__njtInitStage = 'overview:raf';
+    await new Promise((resolve) => {
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        resolve();
+      };
+      requestAnimationFrame(() => requestAnimationFrame(finish));
+      setTimeout(finish, 500);
+    });
     setLoading(100, '准备完成');
   }
 
@@ -829,6 +1020,18 @@
       node = svgEl('g', {});
       node.append(svgEl('line', { x1: points[0].x, y1: points[0].y, x2: points[1].x, y2: points[1].y }));
       node.append(svgEl('polygon', { stroke: 'none' }));
+      if (shape.label) {
+        const label = svgEl('text', { class: 'arrow-label', 'text-anchor': 'middle' });
+        label.textContent = shape.label;
+        node.append(label);
+      }
+    } else if (shape.type === 'text') {
+      node = svgEl('text', { class: 'map-text' });
+      node.textContent = shape.text || '';
+      node.setAttribute('data-shape-id', shape.id);
+      applyTextStyle(shape, node, state.transform.s);
+      layoutTextNode(shape, node, state.transform.s);
+      return node;
     } else {
       node = svgEl('path', { d: G.pathFromPoints(points), 'stroke-linejoin': 'round', 'stroke-linecap': 'round' });
     }
@@ -836,6 +1039,44 @@
     node.setAttribute('stroke', shape.color);
     node.setAttribute('data-shape-id', shape.id);
     return node;
+  }
+
+  /** 文字标注的屏幕字号：跟着字号档位走，缩放时屏幕大小不变。 */
+  function textFontSize(shape) {
+    const size = Number(shape.size);
+    return size > 0 ? size : TEXT_SIZES[1];
+  }
+
+  /** 文字统一带一圈深色描边，地图底色再杂也看得清。 */
+  function applyTextStyle(shape, node, scale) {
+    const font = textFontSize(shape) / (scale || 1);
+    node.setAttribute('font-size', font.toFixed(2));
+    node.setAttribute('font-family', '"Microsoft YaHei", "PingFang SC", sans-serif');
+    node.setAttribute('font-weight', '600');
+    node.setAttribute('fill', shape.color);
+    node.setAttribute('stroke', TEXT_COLOR);
+    node.setAttribute('stroke-width', (font / 5).toFixed(2));
+    node.setAttribute('stroke-linejoin', 'round');
+    node.setAttribute('paint-order', 'stroke');
+  }
+
+  /** 文字锚点是左上角，这里换算成 SVG 的基线位置。 */
+  function layoutTextNode(shape, node, scale) {
+    const anchor = shape.points[0] || [0, 0];
+    const font = textFontSize(shape) / (scale || 1);
+    node.setAttribute('x', (anchor[0] * state.imgW).toFixed(2));
+    node.setAttribute('y', (anchor[1] * state.imgH + font * 0.82).toFixed(2));
+  }
+
+  /** 箭头中段字符锁在中点、始终水平。 */
+  function layoutArrowLabel(shape, node, scale) {
+    const label = node.querySelector('.arrow-label');
+    if (!label || !shape.label) return;
+    const points = imagePoints(shape);
+    const font = textFontSize(shape) / (scale || 1);
+    label.setAttribute('x', ((points[0].x + points[1].x) / 2).toFixed(2));
+    label.setAttribute('y', ((points[0].y + points[1].y) / 2 + font * 0.35).toFixed(2));
+    applyTextStyle(shape, label, scale);
   }
 
   function renderShapes() {
@@ -872,7 +1113,7 @@
       el.btnDeleteShape.disabled = !shape;
       return;
     }
-    const bounds = G.shapeBounds(shape, state.imgW, state.imgH);
+    const bounds = G.shapeBounds(shape, state.imgW, state.imgH, state.transform.s);
     const pad = 7 / (state.transform.s || 1);
     const node = svgEl('rect', {
       class: 'selection-box',
@@ -892,9 +1133,9 @@
     const near = [];
     const inside = [];
     for (const shape of state.shapes) {
-      const distance = G.distanceToShape(imagePoint, shape, state.imgW, state.imgH);
+      const distance = G.distanceToShape(imagePoint, shape, state.imgW, state.imgH, state.transform.s);
       if (distance <= tolerance) near.push({ shape, distance });
-      else if (G.pointInShape(imagePoint, shape, state.imgW, state.imgH)) inside.push(shape);
+      else if (G.pointInShape(imagePoint, shape, state.imgW, state.imgH, state.transform.s)) inside.push(shape);
     }
     if (near.length) return near.sort((a, b) => a.distance - b.distance)[0].shape;
     return inside.length ? inside[inside.length - 1] : null;
@@ -984,11 +1225,7 @@
     return task.note ? `${task.name}（${task.note}）` : task.name;
   }
 
-  function estimateTextWidth(text, fontSize) {
-    let width = 0;
-    for (const char of String(text)) width += char.charCodeAt(0) > 255 ? fontSize : fontSize * 0.56;
-    return width;
-  }
+  const estimateTextWidth = (text, fontSize) => G.estimateTextWidth(text, fontSize);
 
   function buildTaskElement(task, box) {
     const width = state.imgW;
@@ -1412,6 +1649,11 @@
     for (const shape of state.shapes) {
       const node = state.elements.get(shape.id);
       if (!node) continue;
+      if (shape.type === 'text') {
+        applyTextStyle(shape, node, scale);
+        layoutTextNode(shape, node, scale);
+        continue;
+      }
       const userWidth = shape.width / scale;
       if (shape.type === 'arrow') {
         const points = imagePoints(shape);
@@ -1423,6 +1665,7 @@
           polygon.setAttribute('points', head.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '));
           polygon.setAttribute('fill', shape.color);
         }
+        layoutArrowLabel(shape, node, scale);
       } else {
         node.setAttribute('stroke-width', userWidth);
       }
@@ -1453,9 +1696,10 @@
   }
 
   function restore(snap) {
-    const data = snap || { shapes: [], tasks: [] };
+    // 兜底：历史里如果混进了「只有 shapes 的数组」，也不能把任务表一起清掉
+    const data = Array.isArray(snap) ? { shapes: snap } : snap || { shapes: [], tasks: [] };
     state.shapes = data.shapes || [];
-    state.tasks = (data.tasks || []).map(normalizeTask);
+    if (Array.isArray(data.tasks)) state.tasks = data.tasks.map(normalizeTask);
     renderShapes();
     renderTasks();
     updateTaskPanel();
@@ -1555,36 +1799,464 @@
     return total * state.transform.s;
   }
 
+  /* ---------------- 文字标注与就地输入 ---------------- */
+
+  /** 老数据里没有的文字、字号补上默认值，空文字直接丢掉。 */
+  function normalizeShapes(shapes) {
+    return (Array.isArray(shapes) ? shapes : [])
+      .filter((shape) => shape && Array.isArray(shape.points) && shape.points.length)
+      .map((shape) => {
+        if (shape.type === 'text') {
+          shape.text = String(shape.text || '');
+          if (!(Number(shape.size) > 0)) shape.size = TEXT_SIZES[1];
+        }
+        if (shape.type === 'arrow' && shape.label) {
+          shape.label = String(shape.label);
+          if (!(Number(shape.size) > 0)) shape.size = TEXT_SIZES[1];
+        }
+        return shape;
+      })
+      .filter((shape) => !(shape.type === 'text' && !shape.text.trim()));
+  }
+
+  function addTextShape(text, norm, size) {
+    const value = String(text || '').trim();
+    if (!value || !Array.isArray(norm)) return null;
+    const before = snapshot();
+    const shape = {
+      id: G.uid(),
+      type: 'text',
+      color: state.color,
+      size: Number(size) > 0 ? Number(size) : state.textSize,
+      text: value,
+      points: [[Number(norm[0].toFixed(5)), Number(norm[1].toFixed(5))]],
+    };
+    state.shapes.push(shape);
+    renderShapes();
+    commitChange(before);
+    persistNow();
+    return shape;
+  }
+
+  function removeShape(shape) {
+    if (!shape) return;
+    const before = snapshot();
+    state.shapes = state.shapes.filter((item) => item.id !== shape.id);
+    if (state.selectedShapeId === shape.id) {
+      state.selectedShapeId = null;
+      state.selectionEl = null;
+    }
+    renderShapes();
+    commitChange(before);
+    persistNow();
+  }
+
+  /** 就地输入框：新建文字、改写文字、给箭头标中段字符都复用它。 */
+  const textEditorState = { openedAt: 0 };
+
+  /** 让输入框真的拿到光标：鼠标按下的默认行为会把焦点挪回页面，所以等这一轮事件走完再抢。 */
+  function focusTextEditor() {
+    if (!state.editor) return;
+    el.textEditor.focus({ preventScroll: true });
+    el.textEditor.select();
+  }
+
+  function openTextEditor(options) {
+    const shape = options.shapeId ? shapeById(options.shapeId) : null;
+    if (options.shapeId && !shape) return;
+    state.editor = {
+      mode: options.mode,
+      shapeId: options.shapeId || null,
+      norm: (options.norm || [0.5, 0.5]).slice(),
+    };
+    const pos = G.imageToScreen(state.editor.norm[0] * state.imgW, state.editor.norm[1] * state.imgH, state.transform);
+    const rect = el.mapViewport.getBoundingClientRect();
+    const width = 230;
+    const height = 38;
+    const left = G.clamp(pos.x - 8, 8, Math.max(8, rect.width - width - 8));
+    const top = G.clamp(pos.y - height / 2, 8, Math.max(8, rect.height - height - 8));
+    el.textEditor.style.left = `${Math.round(left)}px`;
+    el.textEditor.style.top = `${Math.round(top)}px`;
+    el.textEditor.value = shape ? (options.mode === 'arrowLabel' ? shape.label || '' : shape.text || '') : '';
+    el.textEditor.classList.remove('hidden');
+    textEditorState.openedAt = performance.now();
+    focusTextEditor();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusTextEditor);
+    setTimeout(focusTextEditor, 0);
+    clearTimeout(idleTimer);
+    document.body.classList.remove('ui-idle');
+  }
+
+  function hideTextEditor() {
+    state.editor = null;
+    el.textEditor.value = '';
+    el.textEditor.classList.add('hidden');
+  }
+
+  /** 箭头和它的中段字符算一步撤销：字符输完（或跳过）才一起提交。 */
+  function finalizePendingArrow() {
+    const id = state.pendingArrowId;
+    const before = state.pendingBefore;
+    state.pendingArrowId = null;
+    state.pendingBefore = null;
+    const shape = id ? shapeById(id) : null;
+    if (!shape) return;
+    delete shape.preview;
+    if (screenDistance(shape) < 6) {
+      if (before) restore(before);
+      else {
+        state.shapes = state.shapes.filter((item) => item.id !== shape.id);
+        renderShapes();
+      }
+      return;
+    }
+    renderShape(shape);
+    if (before) commitChange(before);
+    persistNow();
+    pokeToolbars();
+  }
+
+  function commitTextEditor() {
+    if (!state.editor) return;
+    const editor = state.editor;
+    const value = el.textEditor.value.trim();
+    hideTextEditor();
+    if (editor.mode === 'create') {
+      if (value) addTextShape(value, editor.norm);
+      pokeToolbars();
+      return;
+    }
+    const shape = editor.shapeId ? shapeById(editor.shapeId) : null;
+    if (editor.mode === 'editText') {
+      if (!shape) return;
+      if (!value) {
+        removeShape(shape);
+        showToast('文字已清空，标注也一起删掉了');
+        return;
+      }
+      const before = snapshot();
+      shape.text = value;
+      shape.size = state.textSize;
+      renderShape(shape);
+      commitChange(before);
+      persistNow();
+      pokeToolbars();
+      return;
+    }
+    if (editor.mode === 'arrowLabel' && shape) {
+      if (value) {
+        shape.label = value;
+        shape.size = state.textSize;
+      } else {
+        delete shape.label;
+      }
+      finalizePendingArrow();
+      return;
+    }
+    pokeToolbars();
+  }
+
+  function cancelTextEditor() {
+    if (!state.editor) return;
+    const mode = state.editor.mode;
+    hideTextEditor();
+    if (mode === 'arrowLabel') finalizePendingArrow();
+    else pokeToolbars();
+  }
+
+  /** 双击文字改内容、双击箭头加/改中段字符；平移工具下双击仍然是「适合窗口」。 */
+  function onMapDblClick(event) {
+    if (state.view !== 'map' || !state.imgW) return;
+    if (state.editor) {
+      commitTextEditor();
+      return;
+    }
+    if (state.tool === 'text' || state.tool === 'select') {
+      const pos = viewportPoint(event);
+      const image = G.screenToImage(pos.x, pos.y, state.transform);
+      const hit = hitTestShape(image);
+      if (hit && (hit.type === 'text' || hit.type === 'arrow')) {
+        setSelection(hit.id);
+        openTextEditor({
+          mode: hit.type === 'text' ? 'editText' : 'arrowLabel',
+          shapeId: hit.id,
+          norm: hit.type === 'arrow' ? arrowMidNorm(hit) : hit.points[0],
+        });
+        event.preventDefault();
+        return;
+      }
+      if (state.tool === 'text') return;
+    }
+    if (state.tool !== 'pan' && state.tool !== 'select') return;
+    fitView();
+  }
+
   /* ---------------- 指针交互 ---------------- */
 
-  function onMapPointerDown(event) {
-    if (state.view !== 'map' || !state.imgW) return;
-    const pos = viewportPoint(event);
-    const forcePan = event.button === 1 || state.spacePan;
-    const wantsPan = forcePan || (!state.framingTaskId && state.tool === 'pan');
+  let lastPenAt = 0;
+  let strokeGraceTimer = 0;
+
+  function emptyPointerState() {
+    return {
+      mode: null,
+      lastX: 0,
+      lastY: 0,
+      pointerId: null,
+      pointerType: null,
+      lastEventAt: 0,
+      interrupted: false,
+      shapeId: null,
+      boxHit: null,
+      moved: false,
+    };
+  }
+
+  function setPointerState(patch) {
+    state.pointers = Object.assign(emptyPointerState(), patch);
+    return state.pointers;
+  }
+
+  function resetPointerState() {
+    clearTimeout(strokeGraceTimer);
+    strokeGraceTimer = 0;
+    state.pointers = emptyPointerState();
+    document.body.classList.remove('is-panning', 'is-drawing', 'is-moving-shape');
+  }
+
+  function shapeById(id) {
+    return state.shapes.find((shape) => shape.id === id) || null;
+  }
+
+  function pointerMatches(event) {
+    return state.pointers.pointerId == null || event.pointerId === state.pointers.pointerId;
+  }
+
+  /** 只有鼠标需要显式捕获；笔自带隐式捕获，额外插手反而容易和系统抢输入。 */
+  function capturePointer(event) {
+    if (event.pointerType !== 'mouse') return;
     try {
       el.mapViewport.setPointerCapture(event.pointerId);
     } catch {
       /* 合成事件没有真实指针，忽略即可 */
     }
+  }
+
+  function releasePointer(event) {
+    if (!event || event.pointerType !== 'mouse') return;
+    try {
+      if (el.mapViewport.hasPointerCapture(event.pointerId)) el.mapViewport.releasePointerCapture(event.pointerId);
+    } catch {
+      /* 指针早就没了，忽略 */
+    }
+  }
+
+  function normPoint(pos) {
+    const image = G.screenToImage(pos.x, pos.y, state.transform);
+    return G.toNorm(image.x, image.y, state.imgW, state.imgH);
+  }
+
+  function arrowMidNorm(shape) {
+    const from = shape.points[0];
+    const to = shape.points[shape.points.length - 1];
+    return [Number(((from[0] + to[0]) / 2).toFixed(5)), Number(((from[1] + to[1]) / 2).toFixed(5))];
+  }
+
+  /** 开始新的一笔（含圆/方框/箭头）。返回 null 表示这一下被箭头字符输入框接管了。 */
+  function startStroke(pos, event) {
+    if (state.pointers.mode) {
+      finishPointer();
+      if (state.editor) return null;
+    }
+    const norm = normPoint(pos);
+    state.pendingBefore = snapshot();
+    const shape = shapeFromTool(state.tool, norm, norm);
+    if (state.tool === 'arrow') shape.size = state.textSize;
+    shape.preview = true;
+    state.shapes.push(shape);
+    renderShape(shape);
+    setPointerState({
+      mode: 'draw',
+      lastX: pos.x,
+      lastY: pos.y,
+      pointerId: event ? event.pointerId : null,
+      pointerType: event ? event.pointerType : null,
+      lastEventAt: Date.now(),
+      shapeId: shape.id,
+    });
+    document.body.classList.add('is-drawing');
+    return shape;
+  }
+
+  /** 橡皮擦：把划过（含半径范围）的标注直接摘掉，返回擦掉几条。 */
+  function eraseAt(pos) {
+    const image = G.screenToImage(pos.x, pos.y, state.transform);
+    const tolerance = 12 / (state.transform.s || 1);
+    const hits = state.shapes.filter(
+      (shape) => G.distanceToShape(image, shape, state.imgW, state.imgH, state.transform.s) <= tolerance,
+    );
+    if (!hits.length) return 0;
+    const ids = new Set(hits.map((shape) => shape.id));
+    for (const shape of hits) {
+      state.elements.get(shape.id)?.remove();
+      state.elements.delete(shape.id);
+    }
+    state.shapes = state.shapes.filter((shape) => !ids.has(shape.id));
+    if (state.selectedShapeId && ids.has(state.selectedShapeId)) {
+      state.selectedShapeId = null;
+      state.selectionEl = null;
+      el.btnDeleteShape.disabled = true;
+    }
+    return hits.length;
+  }
+
+  function startErase(pos, event) {
+    if (state.pointers.mode) {
+      finishPointer();
+      if (state.editor) return false;
+    }
+    state.pendingBefore = snapshot();
+    setPointerState({
+      mode: 'erase',
+      lastX: pos.x,
+      lastY: pos.y,
+      pointerId: event ? event.pointerId : null,
+      pointerType: event ? event.pointerType : null,
+      lastEventAt: Date.now(),
+      erased: eraseAt(pos),
+    });
+    document.body.classList.add('is-drawing');
+    return true;
+  }
+
+  /** 笔/鼠标移动时取样，笔和鼠标都优先用合并事件里的中间点，线条更连续。 */
+  function pointerSamples(event) {
+    if (typeof event.getCoalescedEvents !== 'function') return [event];
+    let list = [];
+    try {
+      list = event.getCoalescedEvents() || [];
+    } catch {
+      list = [];
+    }
+    if (!list.length) return [event];
+    return list.slice(-60);
+  }
+
+  function appendStrokeMove(event, pos) {
+    const shape = shapeById(state.pointers.shapeId) || state.shapes[state.shapes.length - 1];
+    if (!shape || !shape.preview) return;
+    if (shape.type !== 'pen') {
+      shape.points[1] = normPoint(pos);
+      renderShape(shape);
+      return;
+    }
+    let last = shape.points[shape.points.length - 1];
+    for (const sample of pointerSamples(event)) {
+      const norm = normPoint({ x: sample.clientX, y: sample.clientY });
+      const dx = (norm[0] - last[0]) * state.imgW * state.transform.s;
+      const dy = (norm[1] - last[1]) * state.imgH * state.transform.s;
+      if (Math.hypot(dx, dy) < 1.5) continue;
+      shape.points.push(norm);
+      last = norm;
+    }
+    const node = state.elements.get(shape.id);
+    if (node) node.setAttribute('d', G.pathFromPoints(imagePoints(shape)));
+  }
+
+  /** 没有进行中的笔画，却收到了「左键按着」的移动：补一笔，或续回刚被打断的那一笔。 */
+  function tryStartStrokeFromMove(event) {
+    if (state.editor || state.framingTaskId) return false;
+    if (event.pointerType === 'touch') return false;
+    if (!(event.buttons & 1)) return false;
+    if (state.tool === 'eraser') return startErase(viewportPoint(event), event);
+    if (!DRAW_TOOLS.has(state.tool)) return false;
+    if (resumeInterruptedStroke(event, viewportPoint(event))) return true;
+    return Boolean(startStroke(viewportPoint(event), event));
+  }
+
+  /** 系统把笔的 pointer 序列抢走（pointercancel）后，短时间内把手写续回同一条形状。 */
+  function resumeInterruptedStroke(event, pos) {
+    const pointers = state.pointers;
+    if (!pointers.interrupted || pointers.mode !== 'draw') return false;
+    if (Date.now() - (pointers.lastEventAt || 0) > STROKE_GRACE_MS) return false;
+    const shape = shapeById(pointers.shapeId);
+    if (!shape || !shape.preview) return false;
+    clearTimeout(strokeGraceTimer);
+    strokeGraceTimer = 0;
+    pointers.interrupted = false;
+    pointers.pointerId = event.pointerId;
+    pointers.pointerType = event.pointerType;
+    pointers.lastX = pos.x;
+    pointers.lastY = pos.y;
+    pointers.lastEventAt = Date.now();
+    document.body.classList.add('is-drawing');
+    appendStrokeMove(event, pos);
+    return true;
+  }
+
+  function onMapPointerDown(event) {
+    if (state.view !== 'map' || !state.imgW) return;
+    if (state.editor) {
+      commitTextEditor();
+      return;
+    }
+    const isPen = event.pointerType === 'pen';
+    const isTouch = event.pointerType === 'touch';
+    if (isPen) lastPenAt = Date.now();
+    // 手掌 / 手指贴着屏按下去时不要抢笔的活，也不要让它引发手势
+    if (isTouch && Date.now() - lastPenAt < PEN_PRIORITY_MS) return;
+    const forcePan = event.button === 1 || state.spacePan;
+    const wantsPan = forcePan || (!state.framingTaskId && state.tool === 'pan');
+    if (event.button !== 0 && !forcePan) return;
+    if (isTouch && !wantsPan) return;
+    const pos = viewportPoint(event);
+    // 上一笔被系统打断、还在宽限期内：能续就续，续不上就先收尾
+    if (state.pointers.interrupted && state.pointers.mode === 'draw') {
+      if (DRAW_TOOLS.has(state.tool) && !isTouch && resumeInterruptedStroke(event, pos)) {
+        event.preventDefault();
+        return;
+      }
+      finishPointer();
+    }
+    capturePointer(event);
     if (wantsPan) {
-      const image = G.screenToImage(pos.x, pos.y, state.transform);
-      const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
-      const hit = state.framingTaskId ? null : taskBoxAtPoint(norm);
-      state.pointers = {
+      const hit = state.framingTaskId ? null : taskBoxAtPoint(normPoint(pos));
+      setPointerState({
         mode: 'pan',
         lastX: pos.x,
         lastY: pos.y,
         moved: false,
+        pointerId: event.pointerId,
+        pointerType: event.pointerType,
+        lastEventAt: Date.now(),
         boxHit: hit ? { taskId: hit.task.id, boxId: hit.box.id } : null,
-      };
+      });
       document.body.classList.add('is-panning');
       event.preventDefault();
       return;
     }
-    if (event.button !== 0) return;
     if (state.framingTaskId) {
-      startTaskBox(pos);
+      startTaskBox(pos, event);
+      event.preventDefault();
+      return;
+    }
+    if (state.tool === 'text') {
+      // 点已有的字是「改这条」，点空白才是新建，这样文字工具一直开着也能改字
+      const hit = hitTestShape(G.screenToImage(pos.x, pos.y, state.transform));
+      if (hit && (hit.type === 'text' || hit.type === 'arrow')) {
+        setSelection(hit.id);
+        openTextEditor({
+          mode: hit.type === 'text' ? 'editText' : 'arrowLabel',
+          shapeId: hit.id,
+          norm: hit.type === 'arrow' ? arrowMidNorm(hit) : hit.points[0],
+        });
+      } else {
+        openTextEditor({ mode: 'create', norm: normPoint(pos) });
+      }
+      event.preventDefault();
+      return;
+    }
+    if (state.tool === 'eraser') {
+      startErase(pos, event);
       event.preventDefault();
       return;
     }
@@ -1593,32 +2265,26 @@
       const hit = hitTestShape(image);
       setSelection(hit ? hit.id : null);
       if (hit) {
-        const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
         state.pendingBefore = snapshot();
-        state.pointers = {
+        setPointerState({
           mode: 'move-shape',
           shapeId: hit.id,
-          startNorm: norm,
+          startNorm: normPoint(pos),
           originPoints: hit.points.map((point) => point.slice()),
           lastX: pos.x,
           lastY: pos.y,
-        };
+          pointerId: event.pointerId,
+          pointerType: event.pointerType,
+          lastEventAt: Date.now(),
+        });
         document.body.classList.add('is-moving-shape');
       } else {
-        state.pointers = { mode: null, lastX: 0, lastY: 0 };
+        resetPointerState();
       }
       event.preventDefault();
       return;
     }
-    const image = G.screenToImage(pos.x, pos.y, state.transform);
-    const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
-    state.pendingBefore = deepCopy(state.shapes);
-    const shape = shapeFromTool(state.tool, norm, norm);
-    shape.preview = true;
-    state.shapes.push(shape);
-    renderShape(shape);
-    state.pointers = { mode: 'draw', lastX: pos.x, lastY: pos.y };
-    document.body.classList.add('is-drawing');
+    startStroke(pos, event);
     event.preventDefault();
   }
 
@@ -1631,13 +2297,19 @@
     ];
   }
 
-  function startTaskBox(pos) {
+  function startTaskBox(pos, event) {
     const task = taskById(state.framingTaskId);
     if (!task) return;
-    const image = G.screenToImage(pos.x, pos.y, state.transform);
-    const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
+    const norm = normPoint(pos);
     state.previewBox = { taskId: task.id, start: norm, current: norm, moved: false };
-    state.pointers = { mode: 'framebox', lastX: pos.x, lastY: pos.y };
+    setPointerState({
+      mode: 'framebox',
+      lastX: pos.x,
+      lastY: pos.y,
+      pointerId: event ? event.pointerId : null,
+      pointerType: event ? event.pointerType : null,
+      lastEventAt: Date.now(),
+    });
     document.body.classList.add('is-drawing');
   }
 
@@ -1668,7 +2340,32 @@
   }
 
   function onMapPointerMove(event) {
-    if (!state.pointers.mode) return;
+    if (state.view !== 'map' || !state.imgW) return;
+    if (event.pointerType === 'pen') lastPenAt = Date.now();
+    if (!state.pointers.mode) {
+      tryStartStrokeFromMove(event);
+      return;
+    }
+    if (!pointerMatches(event)) return;
+    // 左键/笔尖松开却没收到 pointerup（或者驱动把 buttons 报成 0）：画笔先挂起，
+    // 宽限期内只要再看到按下的移动就续回同一笔，宽限结束才收笔，避免写成一段一段。
+    if (event.buttons === 0 && event.pointerType !== 'touch') {
+      if (state.pointers.mode === 'draw') {
+        if (!state.pointers.interrupted) {
+          state.pointers.interrupted = true;
+          state.pointers.lastEventAt = Date.now();
+          clearTimeout(strokeGraceTimer);
+          strokeGraceTimer = setTimeout(() => {
+            if (state.pointers.interrupted) finishPointer();
+          }, STROKE_GRACE_MS);
+        }
+        return;
+      }
+      finishPointer();
+      return;
+    }
+    state.pointers.lastEventAt = Date.now();
+    state.pointers.interrupted = false;
     const pos = viewportPoint(event);
     if (state.pointers.mode === 'pan') {
       const dx = pos.x - state.pointers.lastX;
@@ -1690,8 +2387,7 @@
     if (state.pointers.mode === 'move-shape') {
       const shape = state.shapes.find((item) => item.id === state.pointers.shapeId);
       if (!shape) return;
-      const image = G.screenToImage(pos.x, pos.y, state.transform);
-      const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
+      const norm = normPoint(pos);
       const dx = norm[0] - state.pointers.startNorm[0];
       const dy = norm[1] - state.pointers.startNorm[1];
       shape.points = state.pointers.originPoints.map((point) => point.slice());
@@ -1700,10 +2396,13 @@
       updateSelectionBox();
       return;
     }
+    if (state.pointers.mode === 'erase') {
+      state.pointers.erased = (state.pointers.erased || 0) + eraseAt(pos);
+      return;
+    }
     if (state.pointers.mode === 'framebox' && state.previewBox) {
       const task = taskById(state.previewBox.taskId);
-      const image = G.screenToImage(pos.x, pos.y, state.transform);
-      const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
+      const norm = normPoint(pos);
       state.previewBox.current = norm;
       const dx = (norm[0] - state.previewBox.start[0]) * state.imgW * state.transform.s;
       const dy = (norm[1] - state.previewBox.start[1]) * state.imgH * state.transform.s;
@@ -1711,29 +2410,15 @@
       updatePreviewBox(normRect(state.previewBox.start, norm), task ? task.color : COLORS[0]);
       return;
     }
-    const shape = state.shapes[state.shapes.length - 1];
-    if (!shape || !shape.preview) return;
-    const image = G.screenToImage(pos.x, pos.y, state.transform);
-    const norm = G.toNorm(image.x, image.y, state.imgW, state.imgH);
-    if (shape.type === 'pen') {
-      const last = shape.points[shape.points.length - 1];
-      const dx = (norm[0] - last[0]) * state.imgW * state.transform.s;
-      const dy = (norm[1] - last[1]) * state.imgH * state.transform.s;
-      if (Math.hypot(dx, dy) < 1.5) return;
-      shape.points.push(norm);
-      state.elements.get(shape.id)?.setAttribute('d', G.pathFromPoints(imagePoints(shape)));
-    } else {
-      shape.points[1] = norm;
-      renderShape(shape);
-    }
+    appendStrokeMove(event, pos);
   }
 
-  function onMapPointerUp() {
+  /** 一次指针交互收尾：落笔、落框、落选择、平移都走这里。 */
+  function finishPointer() {
     if (!state.pointers.mode) return;
     const mode = state.pointers.mode;
     const pointerState = state.pointers;
-    state.pointers = { mode: null, lastX: 0, lastY: 0 };
-    document.body.classList.remove('is-panning', 'is-drawing');
+    resetPointerState();
     if (mode === 'framebox') {
       const preview = state.previewBox;
       state.previewBox = null;
@@ -1765,31 +2450,83 @@
     if (mode === 'move-shape') {
       const before = state.pendingBefore;
       state.pendingBefore = null;
-      document.body.classList.remove('is-moving-shape');
       if (before) {
         commitChange(before);
         persistNow();
       }
       return;
     }
-    if (mode !== 'draw') return;
-    const shape = state.shapes[state.shapes.length - 1];
-    const before = state.pendingBefore;
-    state.pendingBefore = null;
-    if (!shape || !shape.preview) return;
-    delete shape.preview;
-    if (screenDistance(shape) < 6) {
-      state.shapes = before || state.shapes.filter((item) => item.id !== shape.id);
-      renderShapes();
+    if (mode === 'erase') {
+      const before = state.pendingBefore;
+      state.pendingBefore = null;
+      const erased = pointerState.erased || 0;
+      if (erased && before) {
+        commitChange(before);
+        persistNow();
+        showToast(`擦掉了 ${erased} 条标注`);
+      }
       return;
     }
-    commitChange(before || []);
+    if (mode !== 'draw') return;
+    const shape = shapeById(pointerState.shapeId) || state.shapes[state.shapes.length - 1];
+    if (!shape || !shape.preview) return;
+    if (screenDistance(shape) < 6) {
+      const before = state.pendingBefore;
+      state.pendingBefore = null;
+      if (before) restore(before);
+      else {
+        state.shapes = state.shapes.filter((item) => item.id !== shape.id);
+        renderShapes();
+      }
+      return;
+    }
+    // 箭头先问中段字符，箭头和字符合成一步撤销
+    if (shape.type === 'arrow') {
+      state.pendingArrowId = shape.id;
+      openTextEditor({ mode: 'arrowLabel', shapeId: shape.id, norm: arrowMidNorm(shape) });
+      return;
+    }
+    const before = state.pendingBefore;
+    state.pendingBefore = null;
+    delete shape.preview;
+    renderShape(shape);
+    if (before) commitChange(before);
     persistNow();
+  }
+
+  function onMapPointerUp(event) {
+    if (event) {
+      if (event.pointerType === 'pen') lastPenAt = Date.now();
+      if (state.pointers.mode && !pointerMatches(event)) return;
+      releasePointer(event);
+    }
+    finishPointer();
+  }
+
+  /** pointercancel 多半是系统把手写序列抢去当手势了，画笔先留个宽限再看能不能续回来。 */
+  function onMapPointerCancel(event) {
+    if (event) {
+      if (event.pointerType === 'pen') lastPenAt = Date.now();
+      if (state.pointers.mode && !pointerMatches(event)) return;
+      releasePointer(event);
+    }
+    if (state.pointers.mode === 'draw') {
+      state.pointers.interrupted = true;
+      state.pointers.lastEventAt = Date.now();
+      clearTimeout(strokeGraceTimer);
+      strokeGraceTimer = setTimeout(() => {
+        if (state.pointers.interrupted) finishPointer();
+      }, STROKE_GRACE_MS);
+      return;
+    }
+    finishPointer();
   }
 
   /* ---------------- 视图切换 ---------------- */
 
   function setTool(tool) {
+    if (state.editor) commitTextEditor();
+    if (state.pointers.mode === 'draw' && state.pointers.interrupted) finishPointer();
     state.tool = tool;
     document.body.dataset.tool = tool;
     for (const button of el.toolGroup.querySelectorAll('.tool')) {
@@ -1820,10 +2557,27 @@
       button.classList.toggle('active', Number(button.dataset.width) === width);
     }
     const shape = selectedShape();
-    if (shape && shape.width !== width) {
+    if (shape && shape.type !== 'text' && shape.width !== width) {
       const before = snapshot();
       shape.width = width;
       renderShapes();
+      commitChange(before);
+      persistNow();
+    }
+  }
+
+  /** 字号档位：既决定接下来写的字多大，也能改选中的文字和箭头中段字符。 */
+  function setTextSize(size) {
+    state.textSize = size;
+    for (const button of el.sizeGroup.querySelectorAll('.size-btn')) {
+      button.classList.toggle('active', Number(button.dataset.size) === size);
+    }
+    const shape = selectedShape();
+    const target = shape && (shape.type === 'text' || (shape.type === 'arrow' && shape.label)) ? shape : null;
+    if (target && Number(target.size) !== size) {
+      const before = snapshot();
+      target.size = size;
+      renderShape(target);
       commitChange(before);
       persistNow();
     }
@@ -1860,11 +2614,13 @@
     const region = regionById(id);
     if (!region) return;
     if (state.view === 'map' && state.regionId && state.regionId !== id) await persistNow();
+    if (state.editor) cancelTextEditor();
+    if (state.pointers.mode) finishPointer();
     const saved = state.annotations.maps?.[id] || {};
     state.view = 'map';
     state.regionId = id;
     rememberRegion(id);
-    state.shapes = deepCopy(saved.shapes || []);
+    state.shapes = normalizeShapes(deepCopy(saved.shapes || []));
     state.selectedShapeId = null;
     state.selectionEl = null;
     state.framingTaskId = null;
@@ -1904,6 +2660,8 @@
 
   async function goOverview() {
     if (state.view === 'overview') return;
+    if (state.editor) cancelTextEditor();
+    if (state.pointers.mode) finishPointer();
     await persistNow();
     state.framingTaskId = null;
     state.taskFormOpen = false;
@@ -1957,8 +2715,22 @@
       button.addEventListener('click', () => setWidth(width));
       el.widthGroup.append(button);
     }
+    el.sizeGroup.textContent = '';
+    for (const size of TEXT_SIZES) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn size-btn';
+      button.dataset.size = String(size);
+      button.title = `文字大小 ${size}px`;
+      const glyph = document.createElement('i');
+      glyph.textContent = 'A';
+      button.append(glyph);
+      button.addEventListener('click', () => setTextSize(size));
+      el.sizeGroup.append(button);
+    }
     setColor(state.color);
     setWidth(state.width);
+    setTextSize(state.textSize);
   }
 
   function bindEvents() {
@@ -2017,6 +2789,15 @@
     el.btnTaskCancel.addEventListener('click', () => openTaskForm(false));
     el.btnTaskUndo.addEventListener('click', undoFraming);
     el.btnScav.addEventListener('click', openScav);
+    el.btnSeasonPoints.addEventListener('click', async () => {
+      showToast('赛季文件刷点：功能还在做，敬请期待', 2400);
+    });
+    el.btnAnnounce.addEventListener('click', showAnnouncementManually);
+    el.btnAnnounceOk.addEventListener('click', closeAnnouncement);
+    el.btnAnnounceClose.addEventListener('click', closeAnnouncement);
+    el.announceModal.addEventListener('click', (event) => {
+      if (event.target === el.announceModal) closeAnnouncement();
+    });
     el.btnScavAgain.addEventListener('click', () => rollScav());
     el.btnScavClose.addEventListener('click', closeScav);
     el.btnDance.addEventListener('click', openDance);
@@ -2041,8 +2822,38 @@
     el.mapViewport.addEventListener('pointerdown', onMapPointerDown);
     el.mapViewport.addEventListener('pointermove', onMapPointerMove);
     el.mapViewport.addEventListener('pointerup', onMapPointerUp);
-    el.mapViewport.addEventListener('pointercancel', onMapPointerUp);
-    el.mapViewport.addEventListener('dblclick', fitView);
+    el.mapViewport.addEventListener('pointercancel', onMapPointerCancel);
+    el.mapViewport.addEventListener('lostpointercapture', onMapPointerCancel);
+    el.mapViewport.addEventListener('dblclick', onMapDblClick);
+    el.textEditor.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelTextEditor();
+        return;
+      }
+      if (event.key === 'Enter' && !event.isComposing) {
+        event.preventDefault();
+        commitTextEditor();
+      }
+    });
+    // 点到别处就当成确认：有内容落字，空内容等于取消
+    el.textEditor.addEventListener('blur', () => {
+      if (!state.editor) return;
+      // 刚弹出来的瞬间失焦是鼠标按下的默认行为抢的，不是用户真的点到别处
+      if (performance.now() - textEditorState.openedAt < 250) return;
+      commitTextEditor();
+    });
+    // 点地图交给 onMapPointerDown（提交并吞掉这一下），点其它界面元素就正常确认
+    window.addEventListener(
+      'pointerdown',
+      (event) => {
+        if (!state.editor) return;
+        if (event.target === el.textEditor) return;
+        if (el.mapViewport.contains(event.target)) return;
+        commitTextEditor();
+      },
+      true,
+    );
     el.mapViewport.addEventListener(
       'wheel',
       (event) => {
@@ -2061,6 +2872,8 @@
     window.addEventListener('pointermove', pokeToolbars);
     window.addEventListener('pointerdown', pokeToolbars);
     window.addEventListener('beforeunload', () => {
+      if (state.pointers.interrupted) finishPointer();
+      if (penLog.enabled) flushPenLog(true);
       persistNow();
     });
     document.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -2087,7 +2900,8 @@
         return;
       }
       if (event.key === 'Escape') {
-        if (scav.open) closeScav();
+        if (announcement.open) closeAnnouncement();
+        else if (scav.open) closeScav();
         else if (dance.open) closeDance();
         else if (state.calibration) setCalibration(false);
         else if (state.framingTaskId) stopFraming();
@@ -2139,7 +2953,7 @@
         zoomBy(1 / 1.35);
         return;
       }
-      const shortcut = { v: 'pan', s: 'select', c: 'ellipse', r: 'rect', a: 'arrow', p: 'pen' }[event.key.toLowerCase()];
+      const shortcut = { v: 'pan', s: 'select', c: 'ellipse', r: 'rect', a: 'arrow', p: 'pen', t: 'text', e: 'eraser' }[event.key.toLowerCase()];
       if (shortcut && !ctrl) setTool(shortcut);
     });
     window.addEventListener('keyup', (event) => {
@@ -2482,6 +3296,22 @@
       state.shapes.length,
     );
 
+    const textShape = addTextShape('东楼 102', [0.3, 0.5], TEXT_SIZES[2]);
+    const textNode = textShape ? state.elements.get(textShape.id) : null;
+    record(
+      '地图文字标注可以创建',
+      Boolean(textShape) && textNode?.tagName.toLowerCase() === 'text' && Number(textNode.getAttribute('font-size')) > 0,
+      textShape ? `${textShape.text} / ${textShape.size}px` : '创建失败',
+    );
+    const textHit = G.distanceToShape(
+      { x: (0.3 * state.imgW) + 6, y: (0.5 * state.imgH) + 6 },
+      textShape,
+      state.imgW,
+      state.imgH,
+      state.transform.s,
+    );
+    record('文字标注可以被点中', textHit === 0, textHit);
+
     const widthAt = (shape) => Number(state.elements.get(shape.id)?.getAttribute('stroke-width') || 0);
     const screenWidthAtFit = widthAt(rect) * state.transform.s;
     zoomBy(3, 500, 400);
@@ -2725,11 +3555,19 @@
         tool: state.tool,
         color: state.color,
         width: state.width,
+        textSize: state.textSize,
         shapeCount: state.shapes.length,
         history: state.history.length,
         future: state.future.length,
         calibration: state.calibration,
         fullLoaded: el.mapFull.classList.contains('is-loaded'),
+        pointers: {
+          mode: state.pointers.mode,
+          pointerId: state.pointers.pointerId,
+          pointerType: state.pointers.pointerType,
+          interrupted: Boolean(state.pointers.interrupted),
+        },
+        editor: state.editor ? { mode: state.editor.mode, shapeId: state.editor.shapeId } : null,
       }),
       config: () => state.config,
       hotspots: () => state.config.regions.map((region) => ({ id: region.id, name: region.name, hotspot: region.hotspot.slice() })),
@@ -2744,6 +3582,14 @@
       setWidth,
       drawShape: (type, from, to) => addShape(shapeFromTool(type, from.slice(), to.slice())),
       addPen: (points) => addShape({ id: G.uid(), type: 'pen', color: state.color, width: state.width, points: points.map((pt) => pt.slice()) }),
+      addText: (text, x, y, size) => deepCopy(addTextShape(text, [x, y], size)),
+      setTextSize,
+      editorOpen: () => Boolean(state.editor),
+      penLog: () => penLog.entries.slice(),
+      penLogClear: () => {
+        penLog.entries.length = 0;
+        return true;
+      },
       shapes: () => deepCopy(state.shapes),
       tasks: () => deepCopy(state.tasks),
       framingTaskId: () => state.framingTaskId,
@@ -2782,6 +3628,17 @@
         hidden: () => ui.rightHidden,
         toggle: toggleRightPanel,
         set: (value) => toggleRightPanel(Boolean(value)),
+      },
+      announcement: {
+        show: showAnnouncementManually,
+        auto: maybeShowAnnouncement,
+        close: closeAnnouncement,
+        state: () => ({
+          open: announcement.open,
+          seen: prefs.announcement.seen,
+          muted: prefs.announcement.muted,
+          version: (state.config && state.config.announcements && state.config.announcements.version) || '',
+        }),
       },
       prefs: () => deepCopy(prefs),
       setPrefs: (patch) => {
@@ -2830,7 +3687,7 @@
       undo,
       redo,
       clear: () => {
-        const before = deepCopy(state.shapes);
+        const before = snapshot();
         state.shapes = [];
         renderShapes();
         commitChange(before);
@@ -2866,6 +3723,7 @@
   /* ---------------- 启动 ---------------- */
 
   async function init() {
+    window.__njtInitStage = 'start';
     el.loading = document.getElementById('loading');
     el.loadingGif = document.getElementById('loading-gif');
     el.loadingFill = document.getElementById('loading-fill');
@@ -2904,11 +3762,20 @@
     el.taskName = document.getElementById('task-name');
     el.taskNote = document.getElementById('task-note');
     el.taskColors = document.getElementById('task-colors');
+    el.textEditor = document.getElementById('text-editor');
+    el.btnSeasonPoints = document.getElementById('btn-season-points');
     el.btnTaskAdd = document.getElementById('btn-task-add');
     el.btnTaskUndo = document.getElementById('btn-task-undo');
     el.btnTaskCreate = document.getElementById('btn-task-create');
     el.btnTaskLabels = document.getElementById('btn-task-labels');
     el.btnScav = document.getElementById('btn-scav');
+    el.btnAnnounce = document.getElementById('btn-announce');
+    el.announceModal = document.getElementById('announce-modal');
+    el.announceTitle = document.getElementById('announce-title');
+    el.announceList = document.getElementById('announce-list');
+    el.announceMute = document.getElementById('announce-mute');
+    el.btnAnnounceOk = document.getElementById('btn-announce-ok');
+    el.btnAnnounceClose = document.getElementById('btn-announce-close');
     el.scavModal = document.getElementById('scav-modal');
     el.scavLoot = document.getElementById('scav-loot');
     el.scavTotal = document.getElementById('scav-total');
@@ -2938,6 +3805,7 @@
     el.toolGroup = document.getElementById('tool-group');
     el.colorGroup = document.getElementById('color-group');
     el.widthGroup = document.getElementById('width-group');
+    el.sizeGroup = document.getElementById('size-group');
     el.btnUndo = document.getElementById('btn-undo');
     el.btnRedo = document.getElementById('btn-redo');
     el.btnDeleteShape = document.getElementById('btn-delete-shape');
@@ -2956,20 +3824,29 @@
     el.sideColumn = document.getElementById('side-column');
 
     const loaded = await api.getConfig();
+    window.__njtInitStage = 'config';
     setLoading(35, '正在准备地图数据…');
     if (loaded.version) el.creditVersion.textContent = `v${loaded.version}`;
+    if (loaded.penLog) startPenLog();
     state.config = loaded.config;
     state.overrides = loaded.hotspots || {};
     state.annotations = (await api.loadAnnotations()) || { version: 1, maps: {} };
+    window.__njtInitStage = 'annotations';
     const migration = migrateTasks(state.annotations);
     state.tasks = migration.tasks;
     if (migration.migrated) api.saveAnnotations(state.annotations);
     const settings = (await api.loadSettings()) || {};
+    window.__njtInitStage = 'settings';
     ui.rightHidden = Boolean(settings.rightPanelHidden);
     prefs.lastView = settings.lastView || null;
     prefs.recentRegions = Array.isArray(settings.recentRegions) ? settings.recentRegions : [];
     prefs.restoreLast = settings.restoreLast !== false;
+    prefs.announcement = {
+      seen: (settings.announcement && settings.announcement.seen) || '',
+      muted: Boolean(settings.announcement && settings.announcement.muted),
+    };
     state.config.scav = loaded.scav || { version: 1, cost: 95000, items: [] };
+    state.config.announcements = loaded.announcements || null;
     if (state.config.scav.source) {
       el.scavNote.textContent = `物资与价格取自 ${state.config.scav.source.replace(/^https?:\/\//, '').replace(/\/$/, '')}${
         state.config.scav.fetchedAt ? `（${state.config.scav.fetchedAt} 的跳蚤市场价快照）` : ''
@@ -2994,12 +3871,14 @@
     setLoading(60, '正在布置界面…');
     setTool(state.tool);
     await initOverview();
+    window.__njtInitStage = 'overview';
     renderRecentBar();
     const restoreRegion =
       prefs.restoreLast && prefs.lastView && prefs.lastView.type === 'map' ? regionById(prefs.lastView.regionId) : null;
     if (restoreRegion) {
       setLoading(96, '正在回到上次看的地图…');
       await openRegion(restoreRegion.id);
+      window.__njtInitStage = 'region';
     }
     if (state.view === 'overview') document.body.dataset.view = 'overview';
     updateHistoryButtons();
@@ -3007,11 +3886,15 @@
     pokeToolbars();
     window.__njt = debugApi();
     window.__njtReady = true;
+    window.__njtInitStage = 'ready';
     finishLoading();
+    // 等加载页收起了再弹更新公告，别和启动动画抢
+    setTimeout(maybeShowAnnouncement, 600);
   }
 
   window.addEventListener('DOMContentLoaded', () => {
     init().catch((error) => {
+      window.__njtLastError = `init failed: ${(error && (error.stack || error.message)) || error}`;
       console.error(error);
       const toast = document.getElementById('toast');
       if (toast) {

@@ -73,6 +73,7 @@
       <div class="credit">
         <span class="credit-name">尼沙皇版图浏览小工具</span>
         <span id="credit-version" class="credit-version"></span>
+        <button id="btn-announce" class="btn btn-icon credit-announce" type="button" title="查看本版本更新公告">公告</button>
         <span class="credit-dot">·</span>
         <span>作者：<a id="credit-author" class="credit-link" href="https://space.bilibili.com/500638825?spm_id_from=333.1007.0.0">一只非常屑的彩虹滑稽</a></span>
       </div>
@@ -140,9 +141,12 @@
             <button class="btn tool" data-tool="rect" type="button" title="画方框 (R)">▭</button>
             <button class="btn tool" data-tool="arrow" type="button" title="画箭头 (A)">↗</button>
             <button class="btn tool" data-tool="pen" type="button" title="自由画笔 (P)">✎</button>
+            <button class="btn tool" data-tool="text" type="button" title="地图上写文字 (T)">T</button>
+            <button class="btn tool" data-tool="eraser" type="button" title="橡皮擦：划过就擦掉 (E)">🧽</button>
           </div>
           <div class="group" id="color-group"></div>
           <div class="group" id="width-group"></div>
+          <div class="group" id="size-group"></div>
           <div class="group">
             <button id="btn-undo" class="btn" type="button" title="撤销 (Ctrl+Z)">↶</button>
             <button id="btn-redo" class="btn" type="button" title="重做 (Ctrl+Y)">↷</button>
@@ -191,9 +195,44 @@
         <span id="map-hint">滚轮缩放，按住左键拖拽平移</span>
       </div>
 
+      <div class="map-prep">
+        <button id="btn-season-points" class="scav-button prep-button" type="button" title="赛季文件刷点（正在施工）">
+          <span class="scav-icon">🗂</span>
+          <span class="scav-label">赛季文件刷点</span>
+          <span class="prep-badge">正在施工</span>
+        </button>
+      </div>
+
+      <input
+        id="text-editor"
+        class="text-editor hidden"
+        type="text"
+        maxlength="24"
+        placeholder="输入文字，回车确认"
+        autocomplete="off"
+        spellcheck="false"
+      />
+
     </section>
 
     <div id="toast" class="toast hidden"></div>
+
+    <div id="announce-modal" class="scav-modal hidden">
+      <div class="scav-card announce-card">
+        <header>
+          <span id="announce-title" class="scav-title">更新公告</span>
+          <button id="btn-announce-close" class="btn btn-icon" type="button" aria-label="关闭">✕</button>
+        </header>
+        <ul id="announce-list" class="announce-list"></ul>
+        <div class="announce-actions">
+          <label class="announce-mute">
+            <input id="announce-mute" type="checkbox" />
+            <span>不再提醒</span>
+          </label>
+          <button id="btn-announce-ok" class="btn" type="button">知道了</button>
+        </div>
+      </div>
+    </div>
 
     <script src="js/geom.js"></script>
     <script src="js/scav.js"></script>

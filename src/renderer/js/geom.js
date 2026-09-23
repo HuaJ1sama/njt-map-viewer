@@ -139,19 +139,75 @@
     return Math.abs(norm - 1) * Math.min(rx, ry);
   }
 
-  function distanceToShape(p, shape, imgW, imgH) {
+  /** 粗估一行文字的宽度：中日韩字符按 1 个字宽，其余按 0.56 字宽。 */
+  function estimateTextWidth(text, fontSize) {
+    let width = 0;
+    for (const char of String(text)) width += char.charCodeAt(0) > 255 ? fontSize : fontSize * 0.56;
+    return width;
+  }
+
+  /** 文字标注的屏幕字号换算成图像坐标下的字号（缩放时屏幕大小不变）。 */
+  function textMetrics(shape, scale) {
+    const s = scale || 1;
+    const fontSize = textFontSize(shape) / s;
+    return { fontSize, width: estimateTextWidth(shape.text || '', textFontSize(shape)) / s, height: fontSize * 1.1 };
+  }
+
+  function textFontSize(shape) {
+    const size = Number(shape.size);
+    return size > 0 ? size : 24;
+  }
+
+  /** 文字标注包围盒：锚点是文字左上角。 */
+  function textBounds(shape, imgW, imgH, scale = 1) {
+    const anchor = shape.points[0] || [0, 0];
+    const metrics = textMetrics(shape, scale);
+    return { x: anchor[0] * imgW, y: anchor[1] * imgH, w: metrics.width, h: metrics.height };
+  }
+
+  /** 箭头中段字符的包围盒：以箭头中点为圆心居中。 */
+  function arrowLabelBounds(shape, imgW, imgH, scale = 1) {
+    if (!shape.label || !String(shape.label).trim()) return null;
+    const points = shape.points.map((pt) => toImage(pt, imgW, imgH));
+    if (points.length < 2) return null;
+    const metrics = textMetrics(shape, scale);
+    const cx = (points[0].x + points[1].x) / 2;
+    const cy = (points[0].y + points[1].y) / 2;
+    return { x: cx - metrics.width / 2, y: cy - metrics.height / 2, w: metrics.width, h: metrics.height };
+  }
+
+  function pointInRect(p, rect) {
+    return p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
+  }
+
+  function distanceToShape(p, shape, imgW, imgH, scale = 1) {
+    if (shape.type === 'text') {
+      const box = textBounds(shape, imgW, imgH, scale);
+      return pointInRect(p, box) ? 0 : distToRectOutline(p, box);
+    }
     const points = shape.points.map((pt) => toImage(pt, imgW, imgH));
     if (shape.type === 'rect') return distToRectOutline(p, rectFromPoints(points[0], points[1]));
     if (shape.type === 'ellipse') return distToEllipse(p, ellipseFromPoints(points[0], points[1]));
+    if (shape.type === 'arrow') {
+      const label = arrowLabelBounds(shape, imgW, imgH, scale);
+      const line = distToPolyline(p, points);
+      if (!label) return line;
+      return pointInRect(p, label) ? Math.min(line, 0) : Math.min(line, distToRectOutline(p, label));
+    }
     return distToPolyline(p, points);
   }
 
-  function pointInShape(p, shape, imgW, imgH) {
+  function pointInShape(p, shape, imgW, imgH, scale = 1) {
+    if (shape.type === 'text') return pointInRect(p, textBounds(shape, imgW, imgH, scale));
+    if (shape.type === 'arrow') {
+      const label = arrowLabelBounds(shape, imgW, imgH, scale);
+      return label ? pointInRect(p, label) : false;
+    }
     if (shape.type !== 'rect' && shape.type !== 'ellipse') return false;
     const points = shape.points.map((pt) => toImage(pt, imgW, imgH));
     if (shape.type === 'rect') {
       const rect = rectFromPoints(points[0], points[1]);
-      return p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h;
+      return pointInRect(p, rect);
     }
     const ellipse = ellipseFromPoints(points[0], points[1]);
     if (ellipse.rx < 1e-6 || ellipse.ry < 1e-6) return false;
@@ -160,13 +216,23 @@
     return nx * nx + ny * ny <= 1;
   }
 
-  function shapeBounds(shape, imgW, imgH) {
+  function shapeBounds(shape, imgW, imgH, scale = 1) {
+    if (shape.type === 'text') return textBounds(shape, imgW, imgH, scale);
     const points = shape.points.map((pt) => toImage(pt, imgW, imgH));
     const xs = points.map((pt) => pt.x);
     const ys = points.map((pt) => pt.y);
-    const x = Math.min(...xs);
-    const y = Math.min(...ys);
-    return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+    let x = Math.min(...xs);
+    let y = Math.min(...ys);
+    let maxX = Math.max(...xs);
+    let maxY = Math.max(...ys);
+    const label = shape.type === 'arrow' ? arrowLabelBounds(shape, imgW, imgH, scale) : null;
+    if (label) {
+      x = Math.min(x, label.x);
+      y = Math.min(y, label.y);
+      maxX = Math.max(maxX, label.x + label.w);
+      maxY = Math.max(maxY, label.y + label.h);
+    }
+    return { x, y, w: maxX - x, h: maxY - y };
   }
 
   function translateShape(shape, dxNorm, dyNorm) {
@@ -207,6 +273,9 @@
     arrowHead,
     toNorm,
     toImage,
+    estimateTextWidth,
+    textBounds,
+    arrowLabelBounds,
     distToSegment,
     distToPolyline,
     distToRectOutline,

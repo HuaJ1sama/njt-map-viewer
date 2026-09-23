@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('njt', {
   saveHotspots: (data) => ipcRenderer.invoke('hotspots:save', data),
   loadSettings: () => ipcRenderer.invoke('settings:load'),
   saveSettings: (data) => ipcRenderer.invoke('settings:save', data),
+  savePenLog: (data) => ipcRenderer.invoke('penlog:save', data),
   captureView: () => ipcRenderer.invoke('view:capture'),
   openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   toggleFullscreen: () => ipcRenderer.invoke('win:toggle-fullscreen'),

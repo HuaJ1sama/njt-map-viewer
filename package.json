@@ -1,7 +1,7 @@
 {
   "name": "njt-map-viewer",
   "productName": "尼沙皇版图浏览小工具",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "尼沙皇版图浏览小工具：诺文斯克大地图热点导航 + 标注工具",
   "main": "src/main/main.js",
   "author": "一只非常屑的彩虹滑稽",
@@ -12,6 +12,7 @@
     "smoke": "electron tools/smoke.js",
     "shots": "electron tools/screenshot.js",
     "previews": "python tools/make-previews.py",
+    "archive": "node tools/archive-version.js",
     "dist": "electron-builder --win portable"
   },
   "build": {

@@ -16,10 +16,12 @@ const paths = {
   assetsDir: () => path.join(APP_ROOT, 'assets'),
   configFile: () => path.join(APP_ROOT, 'config', 'regions.json'),
   scavLootFile: () => path.join(APP_ROOT, 'config', 'scav-loot.json'),
+  announcementsFile: () => path.join(APP_ROOT, 'config', 'announcements.json'),
   userDir: () => app.getPath('userData'),
   annotationsFile: () => path.join(app.getPath('userData'), 'annotations.json'),
   hotspotsFile: () => path.join(app.getPath('userData'), 'hotspots.json'),
   settingsFile: () => path.join(app.getPath('userData'), 'settings.json'),
+  penLogFile: () => path.join(app.getPath('userData'), 'pen-log.json'),
 };
 
 const MIME_BY_EXT = {
@@ -182,8 +184,11 @@ function registerIpc() {
       version: readAppVersion(),
       hotspots: sameSpace ? saved.hotspots || {} : {},
       scav: readJsonSync(paths.scavLootFile(), { version: 1, cost: 95000, items: [] }),
+      announcements: readJsonSync(paths.announcementsFile(), null),
       mapsDir: paths.mapsDir(),
       userDataDir: paths.userDir(),
+      // 只有带 --penlog 启动时才记录笔的指针事件，平时不产生任何额外文件
+      penLog: process.argv.includes('--penlog'),
     };
   });
 
@@ -206,6 +211,13 @@ function registerIpc() {
     if (!data || typeof data !== 'object') throw new Error('设置数据格式不正确');
     writeJsonSync(paths.settingsFile(), data);
     return { ok: true, file: paths.settingsFile() };
+  });
+
+  // 数绘屏反馈取证用：把渲染进程记下的 pointer 事件落盘，方便远程排查笔输入问题
+  ipcMain.handle('penlog:save', (_event, data) => {
+    if (!data || typeof data !== 'object') throw new Error('笔迹日志格式不正确');
+    writeJsonSync(paths.penLogFile(), data);
+    return { ok: true, file: paths.penLogFile() };
   });
 
   // 主进程只负责截图，写剪贴板交给渲染进程的异步剪贴板 API（部分 Electron 构建的主进程没有图片剪贴板 API）
